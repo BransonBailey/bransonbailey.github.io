@@ -15,7 +15,7 @@
   var SELF = document.currentScript && document.currentScript.src;
   var RESUME = SELF ? new URL("Bailey_Resume.pdf", SELF).href : "Bailey_Resume.pdf";
 
-  var root, out, input, lastFocus, hist = [], hpos = 0, busy = false;
+  var root, out, input, lastFocus, hist = [], hpos = 0, busy = false, reopenNext = false;
 
   // ---------- achievements (localStorage only) ----------
   var ACH = [
@@ -27,8 +27,22 @@
   var AKEY = "bb-achievements", PKEY = "bb-pages", PAGES = ["about", "projects", "ncl"];
   var TROPHY = "M2 1h12v1h-12zM0 2h16v1h-16zM0 3h1v1h-1zM2 3h12v1h-12zM15 3h1v1h-1zM0 4h1v1h-1zM2 4h12v1h-12zM15 4h1v1h-1zM1 5h1v1h-1zM3 5h10v1h-10zM14 5h1v1h-1zM2 6h12v1h-12zM4 7h8v1h-8zM5 8h6v1h-6zM6 9h4v1h-4zM7 10h2v1h-2zM7 11h2v1h-2zM5 12h6v1h-6zM4 13h8v1h-8zM4 14h8v1h-8z";
 
-  function load(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
-  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  // Storage can be blocked (sandboxed previews, strict privacy modes). Fall back to memory so
+  // progress at least survives for the life of the page instead of resetting on every read.
+  function store(kind) {
+    try { var s = window[kind], k = "__bb"; s.setItem(k, k); s.removeItem(k); return s; } catch (e) { return null; }
+  }
+  var LS = store("localStorage"), SS = store("sessionStorage"), MEM = {};
+  function load(k, s) {
+    s = s || LS;
+    if (s) { try { return JSON.parse(s.getItem(k)) || {}; } catch (e) {} }
+    return MEM[k] ? JSON.parse(MEM[k]) : {};
+  }
+  function save(k, v, s) {
+    s = s || LS;
+    MEM[k] = JSON.stringify(v);
+    if (s) { try { s.setItem(k, MEM[k]); } catch (e) {} }
+  }
   function achName(id) { for (var i = 0; i < ACH.length; i++) if (ACH[i][0] === id) return ACH[i][1]; return id; }
 
   var queue = [], showing = false;
@@ -128,6 +142,35 @@
     })();
   }
 
+  // ---------- shell session (sessionStorage: this tab only, cleared when it closes) ----------
+  var SKEY = "bb-shell", MAXLINES = 200, SAFE_HREF = /^(https?:|mailto:|file:)/i;
+
+  function persist(reopen) {
+    if (!out) return;
+    var lines = [];
+    var rows = out.children;
+    for (var i = Math.max(0, rows.length - MAXLINES); i < rows.length; i++) {
+      var d = rows[i], a = d.querySelector("a");
+      var l = { c: d.className || null, t: d.textContent };
+      if (a) { l.t = d.firstChild && d.firstChild.nodeType === 3 ? d.firstChild.nodeValue : ""; l.a = a.textContent; l.h = a.href; }
+      lines.push(l);
+    }
+    save(SKEY, { lines: lines, hist: hist.slice(-50), open: !!reopen }, SS);
+  }
+
+  function restore() {
+    var st = load(SKEY, SS);
+    if (!st.lines) return false;
+    out.textContent = "";
+    st.lines.forEach(function (l) {
+      if (l.a && SAFE_HREF.test(l.h || "")) link(l.t || "", l.a, l.h);
+      else line(l.t, l.c);
+    });
+    hist = (st.hist || []).filter(function (h) { return typeof h === "string"; });
+    hpos = hist.length;
+    return !!st.open;
+  }
+
   var COMMANDS = {
     help: function () {
       [["whoami", "who runs this box"],
@@ -182,7 +225,8 @@
       var a = (args[0] || "about").replace(/\/$/, "").replace(/^~$/, "about");
       var href = pageHref(a === "about" || a === ".." ? "about" : a);
       if (!href) { line("cd: " + args[0] + ": No such file or directory", "err"); return; }
-      close();
+      reopenNext = true; persist(true); // the next page picks the shell back up, still open
+      if (href.charAt(0) !== "#") close(); // same-document (#hash) jumps keep this shell open as-is
       location.href = href;
     },
     sudo: function (args) {
@@ -213,7 +257,7 @@
       });
       line(n === ACH.length ? "100% complete. Thanks for playing." : "Progress is saved in this browser only.", n === ACH.length ? "hi" : "dim");
     },
-    clear: function () { out.textContent = ""; },
+    clear: function () { out.textContent = ""; persist(false); },
     exit: function () { close(); }
   };
 
@@ -266,7 +310,7 @@
       else if (e.key === "ArrowUp" && hpos > 0) { e.preventDefault(); input.value = hist[--hpos]; }
       else if (e.key === "ArrowDown") { e.preventDefault(); hpos = Math.min(hist.length, hpos + 1); input.value = hist[hpos] || ""; }
     });
-    line("Welcome. Type 'help' for commands.", "dim");
+    if (!restore()) line("Welcome. Type 'help' for commands.", "dim");
   }
 
   function open() {
@@ -284,6 +328,15 @@
   }
 
   visit();
+  // Resume the shell if the visitor left this tab's last page with it open (e.g. via cd).
+  if (load(SKEY, SS).open) {
+    build(); // build() restores scrollback and history
+    persist(false);
+    root.hidden = false;
+    input.focus();
+  }
+  // Save scrollback/history when leaving by any route (nav links, back button); cd also asks to reopen.
+  window.addEventListener("pagehide", function () { persist(reopenNext); });
   window.addEventListener("hashchange", visit); // the combined preview switches pages by #hash
 
   document.addEventListener("keydown", function (e) {
