@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects // Branson Bailey</title>
+<meta name="description" content="Projects by Branson Bailey: A.E.G.I.S. self-hosted AI assistant, Graylog auto installer, anti-forensics research tool, Security Onion home lab, and a lab server and firewall build.">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<nav aria-label="Primary">
+  <div class="nav-inner">
+    <a class="mark" href="../">BB//</a>
+    <div class="nav-links">
+      <a href="../">About</a>
+      <a href="./" class="active" aria-current="page">Projects</a>
+      <a href="../ncl/">NCL</a>
+      <a href="../#contact">Contact</a>
+    </div>
+  </div>
+</nav>
+
+<main class="report" id="top">
+
+  <h1>PROJECTS<span class="cursor" aria-hidden="true">_</span></h1>
+  <div class="subtitle">Home labs <span class="accent">//</span> Tooling <span class="accent">//</span> Research</div>
+
+  <p class="lede">Things I've built to learn by doing: a self-hosted AI assistant, automation for security tooling, and lab environments documented step by step so others can follow along.</p>
+
+  <!-- ===================== FEATURED ===================== -->
+  <h2 id="aegis"><span>Featured</span><span class="idx">01</span></h2>
+
+  <article class="feature">
+    <div class="feature-head">
+      <h3>A.E.G.I.S.</h3>
+      <span class="status">In development</span>
+    </div>
+    <div class="expand">AI-Enhanced Guidance and Intelligence System</div>
+    <p>A personal AI assistant in the spirit of JARVIS: it sees, listens, remembers, and talks back. It's built privacy-first: the assistant, its memory, and its data run on hardware I control and are reachable only over my private network.</p>
+    <div class="feature-cols">
+      <div>
+        <div class="col-label">Capabilities</div>
+        <ul class="cap-list">
+          <li>Wake-word voice commands with spoken replies</li>
+          <li>Camera vision, person tracking, and face recognition</li>
+          <li>Long-term memory of conversations and routines</li>
+          <li>Device security checks and self-diagnostics</li>
+          <li>Automated reports delivered over Signal</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-label">Build</div>
+        <table class="spec">
+          <tr><td>Vision</td><td>DeepFace, MediaPipe</td></tr>
+          <tr><td>Memory</td><td>FAISS, SQLite</td></tr>
+          <tr><td>Voice</td><td>edge-tts, sounddevice</td></tr>
+          <tr><td>Access</td><td>Private network only</td></tr>
+          <tr><td>Channels</td><td>Desktop, Signal</td></tr>
+        </table>
+      </div>
+    </div>
+  </article>
+
+  <!-- ===================== INDEX ===================== -->
+  <h2 id="more"><span>More Projects</span><span class="idx">02</span></h2>
+
+  <div class="proj">
+    <div class="proj-num">02</div>
+    <div>
+      <h3>Graylog Auto Installer</h3>
+      <p>One-shot Bash script that deploys Graylog 6.0 with MongoDB and OpenSearch on Ubuntu Server 24.04. It generates secrets, pins key packages against unintended upgrades, tunes OpenSearch memory, and opens a Syslog UDP input on 5140.</p>
+      <div class="tags"><span class="tag">Bash</span><span class="tag">Graylog</span><span class="tag">OpenSearch</span><span class="tag">SIEM</span></div>
+    </div>
+    <a class="proj-link" href="https://github.com/BransonBailey/Project-blog/tree/main/Basic_Graylog_Installation">Source &rarr;</a>
+  </div>
+
+  <div class="proj">
+    <div class="proj-num">03</div>
+    <div>
+      <h3>Anti-Forensics Research Tool</h3>
+      <p>A Go program built to study anti-forensic techniques, including process tracking and drive overwriting, in a controlled lab environment. The build is documented in a YouTube walkthrough series.</p>
+      <div class="tags"><span class="tag">Go</span><span class="tag">Forensics</span><span class="tag">Windows</span></div>
+      <div class="warn" style="margin-top:8px;">Educational use only, in controlled environments</div>
+    </div>
+    <a class="proj-link" href="https://github.com/BransonBailey/Project-blog/tree/main/Anti-Forensics">Source &rarr;</a>
+  </div>
+
+  <div class="proj">
+    <div class="proj-num">04</div>
+    <div>
+      <h3>Security Onion Home Lab</h3>
+      <p>Installed and deployed Security Onion in a home lab for network security monitoring, with a written install-to-first-deployment walkthrough.</p>
+      <div class="tags"><span class="tag">NSM</span><span class="tag">IDS</span><span class="tag">Home Lab</span></div>
+    </div>
+    <a class="proj-link" href="https://github.com/BransonBailey/Project-blog/tree/main/Security%20Onion">Writeup &rarr;</a>
+  </div>
+
+  <div class="proj">
+    <div class="proj-num">05</div>
+    <div>
+      <h3>Lab Server &amp; Firewall Build</h3>
+      <p>Built a lab network and server from scratch, with step-by-step guides for the network layout and the firewall configuration.</p>
+      <div class="tags"><span class="tag">Networking</span><span class="tag">Firewall</span><span class="tag">Infrastructure</span></div>
+    </div>
+    <a class="proj-link" href="https://github.com/BransonBailey/Project-blog/tree/main/Server%20Setup">Writeup &rarr;</a>
+  </div>
+
+  <div class="footer">BRANSON BAILEY // &copy; 2026 &middot; Set in Monocraft &amp; Sourcerer &middot; Gotham palette</div>
+</main>
+
+</body>
+</html>
