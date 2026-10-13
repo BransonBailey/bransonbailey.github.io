@@ -156,7 +156,7 @@ blockquote footer strong { color: var(--fg); }
 .contact .stat-value { font-size: 15px; color: var(--accent-hi); word-break: break-all; }
 .contact a:hover .stat-value { color: var(--gold); }
 
-.footer .heart { width: 1.17em; height: 1em; fill: var(--gold); vertical-align: -0.12em; margin-left: 2px; }
+.footer .heart { width: 14px; height: 12px; fill: var(--gold); vertical-align: -1px; margin-left: 2px; }
 .footer { margin-top: 64px; font-size: 10.5px; color: var(--faint); letter-spacing: 0.5px; text-align: center; }
 
 /* ---------- terminal easter egg (press `) ---------- */
