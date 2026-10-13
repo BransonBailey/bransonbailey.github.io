@@ -18,6 +18,11 @@
   --purple: #8b5a8c;
   --green: #a1c659;
   --red: #c43e1c;
+  /* pixel-art corner: two 2px steps cut into each corner */
+  --notch: polygon(0 4px, 2px 4px, 2px 2px, 4px 2px, 4px 0,
+    calc(100% - 4px) 0, calc(100% - 4px) 2px, calc(100% - 2px) 2px, calc(100% - 2px) 4px, 100% 4px,
+    100% calc(100% - 4px), calc(100% - 2px) calc(100% - 4px), calc(100% - 2px) calc(100% - 2px), calc(100% - 4px) calc(100% - 2px), calc(100% - 4px) 100%,
+    4px 100%, 4px calc(100% - 2px), 2px calc(100% - 2px), 2px calc(100% - 4px), 0 calc(100% - 4px));
 }
 
 * { box-sizing: border-box; }
@@ -184,6 +189,8 @@ blockquote footer strong { color: var(--fg); }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .cursor { animation: none; }
+  .go-start { animation: none; }
+  .ach-toast { transition: none; }
   .bar-fill { animation: none; }
 }
 
@@ -198,6 +205,53 @@ blockquote footer strong { color: var(--fg); }
 .explore p { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
 table.data td.mono { font-size: 12px; color: var(--muted); letter-spacing: 0.5px; }
 
+
+/* ---------- notched pixel cards ----------
+   clip-path would also cut a normal border, so the outline is the card's own background (--o)
+   and the panel fill is a ::before inset by the 1px transparent border, notched the same way. */
+.stat-card, .feature, blockquote, .contact a, .explore a, .ach-toast {
+  --o: var(--border); position: relative; isolation: isolate;
+  border-color: transparent; border-radius: 0; background: var(--o); clip-path: var(--notch);
+}
+.stat-card::before, .feature::before, blockquote::before, .contact a::before, .explore a::before, .ach-toast::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; background: var(--panel); clip-path: var(--notch);
+}
+.contact a:hover, .explore a:hover { --o: var(--accent); border-color: transparent; }
+/* clip-path hides focus outlines, so focus lights the pixel outline instead */
+.contact a:focus-visible, .explore a:focus-visible { --o: var(--gold); outline: none; }
+
+/* ---------- contact icons (16x16 grid, same as favicon) ---------- */
+.contact a { display: grid; grid-template-columns: 32px 1fr; column-gap: 14px; align-items: center; }
+.contact .px-icon { grid-row: span 2; width: 32px; height: 32px; color: var(--accent-hi); }
+.contact a:hover .px-icon, .contact a:focus-visible .px-icon { color: var(--gold); }
+.contact .stat-label { margin-bottom: 0; }
+
+/* ---------- project cartridges ---------- */
+.cart { display: block; width: 48px; height: 60px; }
+.proj { grid-template-columns: 48px 1fr auto; }
+.proj-num { text-align: center; }
+.proj-num .cart { margin-bottom: 6px; }
+.feature-title { display: flex; align-items: center; gap: 16px; }
+
+/* ---------- achievements toast ---------- */
+.ach-toast { --o: var(--gold); position: fixed; top: 72px; right: 20px; z-index: 60; display: flex; align-items: center; gap: 12px;
+  border: 1px solid transparent; padding: 10px 18px 10px 12px; font-family: 'Monocraft', monospace; max-width: calc(100vw - 40px);
+  transform: translateX(calc(100% + 40px)); transition: transform 320ms steps(8); pointer-events: none; }
+.ach-toast.show { transform: none; }
+.ach-toast svg { width: 32px; height: 32px; flex: none; }
+.ach-k { font-size: 10px; letter-spacing: 1.5px; color: var(--gold); }
+.ach-n { font-size: 13px; color: var(--fg); }
+
+/* ---------- 404: GAME OVER ---------- */
+.gameover { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding-top: 48px; }
+.go-title { font-size: clamp(44px, 11vw, 96px); letter-spacing: 6px; margin: 0 0 14px; color: var(--accent-hi); text-shadow: 0 0 22px rgba(138,190,183,0.45); }
+.go-sub { color: var(--muted); font-size: 13px; letter-spacing: 1px; margin: 0 0 40px; }
+.go-continue { font-family: 'Monocraft', monospace; font-size: 22px; letter-spacing: 3px; margin: 0 0 32px; color: var(--fg); }
+.go-continue #go-count { display: inline-block; min-width: 1.4em; color: var(--gold); text-shadow: 0 0 12px rgba(255,215,0,0.5); }
+.go-start { font-family: 'Monocraft', monospace; font-size: 16px; letter-spacing: 2px; color: var(--gold); border: none; padding: 6px 10px; animation: blink 1.1s steps(1) infinite; }
+.go-start:hover, .go-start:focus-visible { color: var(--accent-hi); border: none; animation: none; }
+.gameover .footer { margin-top: 72px; }
+
 /* ---------- responsive (keep last so it overrides base rules) ---------- */
 @media (max-width: 760px) {
   .report { padding-top: 48px; }
@@ -207,7 +261,7 @@ table.data td.mono { font-size: 12px; color: var(--muted); letter-spacing: 0.5px
   .entry { grid-template-columns: 1fr; gap: 4px; }
   .feature { padding: 20px 18px; }
   .feature-cols { grid-template-columns: 1fr; gap: 18px; }
-  .proj { grid-template-columns: 32px 1fr; }
+  .proj { grid-template-columns: 48px 1fr; }
   .proj-link { grid-column: 2; }
   .bar-row { grid-template-columns: 1fr 70px; }
   .bar-label { grid-column: 1 / -1; white-space: normal; }
@@ -217,4 +271,5 @@ table.data td.mono { font-size: 12px; color: var(--muted); letter-spacing: 0.5px
   table.data .hide-sm { display: none; }
   .term { bottom: 12px; font-size: 11.5px; }
   .term-out { height: 220px; }
+  .ach-toast { top: 64px; right: 12px; max-width: calc(100vw - 24px); }
 }

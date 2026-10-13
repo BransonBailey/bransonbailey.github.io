@@ -1,4 +1,5 @@
-/* Easter egg: press ` to open a small shell. Output is built with textContent only (no innerHTML). */
+/* Easter egg: press ` to open a small shell. Output is built with textContent only (no innerHTML).
+   Achievements are stored in this browser's localStorage only; nothing is sent anywhere. */
 (function () {
   "use strict";
 
@@ -12,6 +13,80 @@
   var LINKEDIN = "https://www.linkedin.com/in/branson-bailey/";
 
   var root, out, input, lastFocus, hist = [], hpos = 0, busy = false;
+
+  // ---------- achievements (localStorage only) ----------
+  var ACH = [
+    ["shell", "Found the shell", "Open the terminal"],
+    ["tour", "Grand tour", "Visit all three pages"],
+    ["hire", "Root access", "Run sudo hire branson"],
+    ["lost", "Game over", "Find a page that doesn't exist"]
+  ];
+  var AKEY = "bb-achievements", PKEY = "bb-pages", PAGES = ["about", "projects", "ncl"];
+  var TROPHY = "M2 1h12v1h-12zM0 2h16v1h-16zM0 3h1v1h-1zM2 3h12v1h-12zM15 3h1v1h-1zM0 4h1v1h-1zM2 4h12v1h-12zM15 4h1v1h-1zM1 5h1v1h-1zM3 5h10v1h-10zM14 5h1v1h-1zM2 6h12v1h-12zM4 7h8v1h-8zM5 8h6v1h-6zM6 9h4v1h-4zM7 10h2v1h-2zM7 11h2v1h-2zM5 12h6v1h-6zM4 13h8v1h-8zM4 14h8v1h-8z";
+
+  function load(k) { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch (e) { return {}; } }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function achName(id) { for (var i = 0; i < ACH.length; i++) if (ACH[i][0] === id) return ACH[i][1]; return id; }
+
+  var queue = [], showing = false;
+  function unlock(id) {
+    var got = load(AKEY);
+    if (got[id]) return;
+    got[id] = Date.now();
+    save(AKEY, got);
+    queue.push(achName(id));
+    if (!showing) nextToast();
+  }
+
+  function nextToast() {
+    var name = queue.shift();
+    if (!name) { showing = false; return; }
+    showing = true;
+    var t = document.createElement("div");
+    t.className = "ach-toast";
+    t.setAttribute("role", "status");
+    var NS = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("shape-rendering", "crispEdges");
+    svg.setAttribute("aria-hidden", "true");
+    var path = document.createElementNS(NS, "path");
+    path.setAttribute("fill", "#ffd700");
+    path.setAttribute("d", TROPHY);
+    svg.appendChild(path);
+    var txt = document.createElement("div");
+    var k = document.createElement("div"); k.className = "ach-k"; k.textContent = "ACHIEVEMENT UNLOCKED";
+    var n = document.createElement("div"); n.className = "ach-n"; n.textContent = name;
+    txt.appendChild(k); txt.appendChild(n);
+    t.appendChild(svg); t.appendChild(txt);
+    document.body.appendChild(t);
+    t.getBoundingClientRect(); // commit the off-screen position so the slide-in animates
+    t.classList.add("show");
+    setTimeout(function () {
+      t.classList.remove("show");
+      setTimeout(function () { t.remove(); nextToast(); }, 400);
+    }, 3800);
+  }
+
+  // Which page is this? 404 marks itself; others use the visible nav link marked aria-current.
+  function currentPage() {
+    var go = document.querySelector(".gameover");
+    if (go && go.getClientRects().length) return "404";
+    var cur = document.querySelectorAll('.nav-links a[aria-current="page"]');
+    for (var i = 0; i < cur.length; i++) {
+      if (cur[i].getClientRects().length) return cur[i].textContent.trim().toLowerCase();
+    }
+    return null;
+  }
+
+  function visit() {
+    var p = currentPage();
+    if (p === "404") { setTimeout(function () { unlock("lost"); }, 900); return; }
+    if (PAGES.indexOf(p) < 0) return;
+    var v = load(PKEY);
+    v[p] = 1; save(PKEY, v);
+    if (PAGES.every(function (x) { return v[x]; })) unlock("tour");
+  }
 
   // Page links come from the site's own nav, so they work wherever the page is hosted.
   function pageHref(name) {
@@ -57,6 +132,7 @@
        ["cat resume.pdf", "print the resume"],
        ["cd <about|projects|ncl>", "go to a page"],
        ["sudo hire branson", "you know what this does"],
+       ["achievements", "show your progress"],
        ["clear / exit", "clear the screen / close (or press ` / Esc)"]]
         .forEach(function (c) { line("  " + (c[0] + "                        ").slice(0, 26) + c[1]); });
     },
@@ -119,7 +195,19 @@
         ["  [ok] Real-world pen test experience", "ok", 220],
         ["  [ok] References available (see Recommendation)", "ok", 400],
         ["Access granted. Starting hire sequence...", "hi", 300]
-      ], function () { link("Next step: ", "message me on LinkedIn", LINKEDIN); });
+      ], function () { link("Next step: ", "message me on LinkedIn", LINKEDIN); unlock("hire"); });
+    },
+    achievements: function (args) {
+      if (args[0] === "--reset") { save(AKEY, {}); save(PKEY, {}); line("Progress cleared.", "dim"); return; }
+      var got = load(AKEY), v = load(PKEY), n = 0;
+      ACH.forEach(function (a) { if (got[a[0]]) n++; });
+      line("ACHIEVEMENTS " + n + "/" + ACH.length, "hi");
+      ACH.forEach(function (a) {
+        var ok = !!got[a[0]], hint = a[2];
+        if (a[0] === "tour" && !ok) hint += " (" + PAGES.filter(function (x) { return v[x]; }).length + "/3)";
+        line("  [" + (ok ? "x" : " ") + "] " + ((ok ? a[1] : "???") + "                    ").slice(0, 20) + hint, ok ? "ok" : "dim");
+      });
+      line(n === ACH.length ? "100% complete. Thanks for playing." : "Progress is saved in this browser only.", n === ACH.length ? "hi" : "dim");
     },
     clear: function () { out.textContent = ""; },
     exit: function () { close(); }
@@ -182,6 +270,7 @@
     lastFocus = document.activeElement;
     root.hidden = false;
     input.focus();
+    unlock("shell");
   }
 
   function close() {
@@ -189,6 +278,9 @@
     root.hidden = true;
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
+
+  visit();
+  window.addEventListener("hashchange", visit); // the combined preview switches pages by #hash
 
   document.addEventListener("keydown", function (e) {
     if (e.ctrlKey || e.metaKey || e.altKey) return;

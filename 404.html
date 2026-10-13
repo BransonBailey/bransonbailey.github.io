@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAME OVER // Branson Bailey</title>
+<meta name="robots" content="noindex">
+<script>
+  // GitHub Pages serves this file at any missing path (even /a/b/c), so anchor relative URLs at the site root
+  // when hosted. Opened from disk it already sits next to index.html, so relative paths work as-is.
+  if (location.protocol !== "file:") { var b = document.createElement("base"); b.href = "/"; document.head.appendChild(b); }
+</script>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+<script src="console.js" defer></script>
+</head>
+<body>
+
+<main class="report gameover">
+  <h1 class="go-title">GAME OVER</h1>
+  <p class="go-sub">404 // This page doesn't exist, or it got patched out.</p>
+  <p class="go-continue">CONTINUE? <span id="go-count">9</span></p>
+  <a class="go-start" id="go-start" href="index.html">[ PRESS START ]</a>
+  <div class="footer">BRANSON BAILEY // &copy; 2026 &middot; Made with <svg class="heart" viewBox="0 0 7 6" shape-rendering="crispEdges" role="img" aria-label="love"><path d="M1 0h2v1H1zM4 0h2v1H4zM0 1h7v2H0zM1 3h5v1H1zM2 4h3v1H2zM3 5h1v1H3z"/></svg></div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var n = 9, el = document.getElementById("go-count"), start = document.getElementById("go-start");
+  function home() { location.href = start.href; }
+  var timer = setInterval(function () {
+    var term = document.querySelector(".term");
+    if (term && !term.hidden) return;          // hold the countdown while the terminal is open
+    if (!el.getClientRects().length) { n = 9; el.textContent = "9"; return; }
+    n -= 1;
+    if (n <= 0) { clearInterval(timer); el.textContent = "0"; home(); return; }
+    el.textContent = String(n);
+  }, 1000);
+  document.addEventListener("keydown", function (e) {
+    var term = document.querySelector(".term");
+    if (term && !term.hidden) return;
+    if (e.key === "Enter" && e.target === document.body) home();
+  });
+})();
+</script>
+</body>
+</html>
