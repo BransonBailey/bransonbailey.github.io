@@ -191,6 +191,7 @@ blockquote footer strong { color: var(--fg); }
   .cursor { animation: none; }
   .go-start { animation: none; }
   .ach-toast { transition: none; }
+  .avatar-strip { animation: none; }
   .bar-fill { animation: none; }
 }
 
@@ -252,10 +253,20 @@ table.data td.mono { font-size: 12px; color: var(--muted); letter-spacing: 0.5px
 .go-start:hover, .go-start:focus-visible { color: var(--accent-hi); border: none; animation: none; }
 .gameover .footer { margin-top: 72px; }
 
+/* ---------- pixel avatar: 32x32 sprite, two frames side by side, blink via steps() ---------- */
+.hero { display: flex; align-items: center; gap: 24px; margin-bottom: 10px; }
+.hero h1 { margin: 0; }
+.avatar { width: 96px; height: 96px; flex: none; overflow: hidden; }
+.avatar-strip { display: block; width: 192px; height: 96px; animation: av-blink 4.8s steps(1) infinite; }
+@keyframes av-blink { 0% { transform: none; } 93% { transform: translateX(-50%); } 96% { transform: none; } }
+
 /* ---------- responsive (keep last so it overrides base rules) ---------- */
 @media (max-width: 760px) {
   .report { padding-top: 48px; }
   h1 { font-size: 30px; letter-spacing: 2px; }
+  .hero { gap: 16px; }
+  .avatar { width: 64px; height: 64px; }
+  .avatar-strip { width: 128px; height: 64px; }
   .nav-links { gap: 12px; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .entry { grid-template-columns: 1fr; gap: 4px; }
