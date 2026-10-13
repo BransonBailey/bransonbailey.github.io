@@ -257,8 +257,8 @@ table.data td.mono { font-size: 12px; color: var(--muted); letter-spacing: 0.5px
 .hero { display: flex; align-items: center; gap: 24px; margin-bottom: 10px; }
 .hero h1 { margin: 0; }
 .avatar { width: 96px; height: 96px; flex: none; overflow: hidden; }
-.avatar-strip { display: block; width: 192px; height: 96px; animation: av-blink 4.8s steps(1) infinite; }
-@keyframes av-blink { 0% { transform: none; } 93% { transform: translateX(-50%); } 96% { transform: none; } }
+.avatar-strip { display: block; width: 192px; height: 96px; animation: av-blink 3s steps(1) infinite; }
+@keyframes av-blink { 0% { transform: none; } 95%, 100% { transform: translateX(-50%); } }
 
 /* ---------- responsive (keep last so it overrides base rules) ---------- */
 @media (max-width: 760px) {
