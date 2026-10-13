@@ -148,6 +148,8 @@ blockquote footer { font-size: 12px; color: var(--muted); }
 blockquote footer strong { color: var(--fg); }
 .what .tags { margin-top: 8px; }
 .what a { color: var(--accent-hi); }
+.what h3 a.news-link { color: var(--fg, #e0e0e0); text-decoration: none; }
+.what h3 a.news-link:hover { color: var(--accent-hi); text-decoration: underline; }
 
 /* ---------- contact ---------- */
 .contact { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
