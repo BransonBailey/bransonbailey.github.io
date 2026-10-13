@@ -157,7 +157,7 @@ blockquote footer strong { color: var(--fg); }
 .what h3 a.news-link:hover { color: var(--accent-hi); text-decoration: underline; }
 
 /* ---------- contact ---------- */
-.contact { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.contact { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
 .contact a { display: block; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 16px; color: var(--fg); }
 .contact a:hover { border-color: var(--accent); color: var(--fg); }
 .contact .stat-value { font-size: 15px; color: var(--accent-hi); word-break: break-all; }

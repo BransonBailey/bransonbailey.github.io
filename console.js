@@ -11,6 +11,9 @@
     ["lab-server-firewall/", "Lab server and firewall build"]
   ];
   var LINKEDIN = "https://www.linkedin.com/in/branson-bailey/";
+  var EMAIL = "bransonbailey1@gmail.com";
+  var SELF = document.currentScript && document.currentScript.src;
+  var RESUME = SELF ? new URL("Bailey_Resume.pdf", SELF).href : "Bailey_Resume.pdf";
 
   var root, out, input, lastFocus, hist = [], hpos = 0, busy = false;
 
@@ -140,6 +143,7 @@
       line("branson");
       line("IT Security Intern @ Nucleus Security | Penetration Tester", "dim");
       line("B.S. Cybersecurity, Anderson University (SC) | CSAP, CySA+, Security+, AWS CCP", "dim");
+      link("", EMAIL, "mailto:" + EMAIL);
     },
     ls: function (args) {
       var a = args[0];
@@ -172,7 +176,7 @@
         ["Highlights", "hi", 120],
         ["  NCL Top 0.4% (team) and Top 2.4% (individual) nationally, Fall 2025", null, 120],
         ["  Cybersecurity Club President, 2025 - 2026", null, 120]
-      ]);
+      ], function () { link("Full copy: ", "open Bailey_Resume.pdf", RESUME); });
     },
     cd: function (args) {
       var a = (args[0] || "about").replace(/\/$/, "").replace(/^~$/, "about");
