@@ -155,7 +155,58 @@
       if (a) { l.t = d.firstChild && d.firstChild.nodeType === 3 ? d.firstChild.nodeValue : ""; l.a = a.textContent; l.h = a.href; }
       lines.push(l);
     }
-    save(SKEY, { lines: lines, hist: hist.slice(-50), open: !!reopen }, SS);
+    save(SKEY, { lines: lines, hist: hist.slice(-50), open: !!reopen, ts: Date.now() }, SS);
+  }
+
+  // ---------- carrying state between pages opened from disk ----------
+  // Some browsers (Firefox by default) give every file:// page its own storage, which would split
+  // the shell and achievements per page. When running from disk, the state rides along with each
+  // page change (URL hash + window.name) and is merged into the new page's storage on arrival.
+  // On a real web host all pages share storage, so none of this runs there.
+  var FILE = location.protocol === "file:", CKEY = "bbstate=", NPFX = "bb:";
+  var KNOWN_LINKS = [RESUME, LINKEDIN, "mailto:" + EMAIL];
+
+  function snapshot(reopen) {
+    persist(reopen);
+    return JSON.stringify({ a: load(AKEY), p: load(PKEY), s: load(SKEY, SS) });
+  }
+
+  function carryTo(href, reopen) {
+    if (!FILE) return href;
+    var json = snapshot(reopen);
+    try { window.name = NPFX + json; } catch (e) {}
+    return href + (href.indexOf("#") < 0 ? "#" : "&") + CKEY + encodeURIComponent(json);
+  }
+
+  function takeCarried() {
+    if (!FILE) return null;
+    var st = null, m = location.hash.match(/(?:#|&)bbstate=([^&]*)/);
+    if (m) {
+      try { st = JSON.parse(decodeURIComponent(m[1])); } catch (e) {}
+      var rest = location.hash.replace(/[#&]bbstate=[^&]*/, "").replace(/^&/, "");
+      try { history.replaceState(null, "", location.pathname + location.search + (rest ? "#" + rest.replace(/^#/, "") : "")); } catch (e) {}
+    }
+    if (!st && typeof window.name === "string" && window.name.indexOf(NPFX) === 0) {
+      try { st = JSON.parse(window.name.slice(NPFX.length)); } catch (e) {}
+    }
+    return st && typeof st === "object" ? st : null;
+  }
+
+  function mergeCarried() {
+    var c = takeCarried();
+    if (!c) return;
+    var got = load(AKEY), pages = load(PKEY), i;
+    for (i = 0; i < ACH.length; i++) if (c.a && c.a[ACH[i][0]] && !got[ACH[i][0]]) got[ACH[i][0]] = +c.a[ACH[i][0]] || Date.now();
+    for (i = 0; i < PAGES.length; i++) if (c.p && c.p[PAGES[i]]) pages[PAGES[i]] = 1;
+    save(AKEY, got); save(PKEY, pages);
+    var mine = load(SKEY, SS);
+    if (c.s && Array.isArray(c.s.lines) && (+c.s.ts || 0) > (+mine.ts || 0)) {
+      save(SKEY, {
+        lines: c.s.lines.slice(-MAXLINES).filter(function (l) { return l && typeof l.t === "string"; }),
+        hist: Array.isArray(c.s.hist) ? c.s.hist.slice(-50) : [],
+        open: !!c.s.open, ts: +c.s.ts
+      }, SS);
+    }
   }
 
   function restore() {
@@ -163,10 +214,10 @@
     if (!st.lines) return false;
     out.textContent = "";
     st.lines.forEach(function (l) {
-      if (l.a && SAFE_HREF.test(l.h || "")) link(l.t || "", l.a, l.h);
+      if (l.a && SAFE_HREF.test(l.h || "") && KNOWN_LINKS.indexOf(l.h) >= 0) link(l.t || "", l.a, l.h);
       else line(l.t, l.c);
     });
-    hist = (st.hist || []).filter(function (h) { return typeof h === "string"; });
+    hist = (Array.isArray(st.hist) ? st.hist : []).filter(function (h) { return typeof h === "string"; });
     hpos = hist.length;
     return !!st.open;
   }
@@ -226,8 +277,9 @@
       var href = pageHref(a === "about" || a === ".." ? "about" : a);
       if (!href) { line("cd: " + args[0] + ": No such file or directory", "err"); return; }
       reopenNext = true; persist(true); // the next page picks the shell back up, still open
-      if (href.charAt(0) !== "#") close(); // same-document (#hash) jumps keep this shell open as-is
-      location.href = href;
+      if (href.charAt(0) === "#") { location.href = href; return; } // same-document jump (combined preview)
+      close();
+      location.href = carryTo(href, true);
     },
     sudo: function (args) {
       if (args.join(" ") !== "hire branson") {
@@ -327,6 +379,7 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
 
+  mergeCarried();
   visit();
   // Resume the shell if the visitor left this tab's last page with it open (e.g. via cd).
   if (load(SKEY, SS).open) {
@@ -336,7 +389,24 @@
     input.focus();
   }
   // Save scrollback/history when leaving by any route (nav links, back button); cd also asks to reopen.
-  window.addEventListener("pagehide", function () { persist(reopenNext); });
+  window.addEventListener("pagehide", function () {
+    if (FILE) { try { window.name = NPFX + snapshot(reopenNext); } catch (e) {} } else persist(reopenNext);
+  });
+  // Pages restored by Back/Forward skip the script, so pull in anything newer from the other page.
+  window.addEventListener("pageshow", function (e) {
+    if (!e.persisted) return;
+    mergeCarried();
+    if (root) restore();
+  });
+  // Plain links between the site's own pages (nav bar, buttons) carry the state as well.
+  document.addEventListener("click", function (e) {
+    if (!FILE || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    var a = e.target.closest && e.target.closest("a[href]");
+    if (!a || a.target === "_blank" || a.protocol !== "file:" || a.pathname === location.pathname) return;
+    if (!/(\.html|\/)$/.test(a.pathname)) return; // only pages, not the PDF or other files
+    e.preventDefault();
+    location.href = carryTo(a.href.split("#")[0] + (a.hash || ""), false);
+  });
   window.addEventListener("hashchange", visit); // the combined preview switches pages by #hash
 
   document.addEventListener("keydown", function (e) {
