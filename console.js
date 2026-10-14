@@ -49,7 +49,9 @@
   // ---------- 8-bit sound (Web Audio square waves; no audio files) ----------
   // On by default, but browsers only allow audio after the visitor clicks or types, so nothing
   // plays on page load. The mute choice is stored in this browser only.
-  var MKEY = "bb-sound", AC = window.AudioContext || window.webkitAudioContext, actx = null, master = null;
+  // Desktop only: phones and tablets (touch screen, no mouse) get no sound and no speaker button.
+  var MOBILE = !!(window.matchMedia && matchMedia("(hover: none) and (pointer: coarse)").matches);
+  var MKEY = "bb-sound", AC = MOBILE ? null : (window.AudioContext || window.webkitAudioContext), actx = null, master = null;
   function soundOn() { return !load(MKEY).off; }
   function setSound(on) { save(MKEY, { off: !on, ts: Date.now() }); paintSnd(); if (on) sfx("on"); }
   function audio() {
@@ -423,7 +425,7 @@
     clear: function () { out.textContent = ""; persist(false); },
     mute: function () { setSound(false); line("Sound off. Type 'unmute' to turn it back on.", "dim"); },
     unmute: function () {
-      if (!AC) { line("unmute: this browser has no Web Audio support", "err"); return; }
+      if (!AC) { line(MOBILE ? "unmute: sound effects are desktop-only" : "unmute: this browser has no Web Audio support", "err"); return; }
       setSound(true); line("Sound on.", "dim");
     },
     exit: function () { close(); }
