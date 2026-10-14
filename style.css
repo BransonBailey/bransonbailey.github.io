@@ -329,6 +329,22 @@ table.data td.mono { font-size: 12px; color: var(--muted); letter-spacing: 0.5px
   .avatar-bubble, .talk-strip, .talk-more { animation: none; }
 }
 
+/* ---------- backgrounds: dot grid (every page), dithered glow (home hero), starfield (404) ---------- */
+body { position: relative; background-position: center top;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='2' height='2' fill='%23e0e0e0' fill-opacity='.05'/%3E%3C/svg%3E"); }
+/* bg-glow.png: 300x100 teal ellipse, 4x4 Bayer ordered dither; scaled 4x so each dither dot is a chunky pixel */
+.home::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 400px; z-index: -1; pointer-events: none;
+  background: url(bg-glow.png) calc(50% - 160px) 0 / 1200px 400px no-repeat; image-rendering: pixelated; opacity: 0.22; }
+.arcade { background-image: none; }
+.arcade::before, .arcade::after { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+.arcade::before { opacity: 0.6; background-position: 0 0, 137px 89px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='311' height='311' shape-rendering='crispEdges'%3E%3Crect x='169' y='81' width='2' height='2' fill='%235c6060'/%3E%3Crect x='28' y='41' width='1' height='1' fill='%23e0e0e0'/%3E%3Crect x='191' y='302' width='1' height='1' fill='%23e0e0e0'/%3E%3Crect x='263' y='113' width='1' height='1' fill='%23e0e0e0'/%3E%3Crect x='48' y='226' width='2' height='2' fill='%235c6060'/%3E%3Crect x='39' y='127' width='1' height='1' fill='%23e0e0e0'/%3E%3Crect x='286' y='221' width='1' height='1' fill='%23e0e0e0'/%3E%3Crect x='293' y='67' width='1' height='1' fill='%238abeb7'/%3E%3Crect x='302' y='35' width='2' height='2' fill='%235c6060'/%3E%3Crect x='29' y='117' width='1' height='1' fill='%23e0e0e0'/%3E%3Crect x='289' y='72' width='1' height='1' fill='%235c6060'/%3E%3Crect x='218' y='77' width='1' height='1' fill='%23e0e0e0'/%3E%3Crect x='296' y='161' width='1' height='1' fill='%238abeb7'/%3E%3Crect x='56' y='301' width='1' height='1' fill='%238abeb7'/%3E%3Crect x='194' y='53' width='1' height='1' fill='%23e0e0e0'/%3E%3Crect x='292' y='34' width='1' height='1' fill='%238abeb7'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='467' height='467' shape-rendering='crispEdges'%3E%3Crect x='235' y='447' width='2' height='2' fill='%238abeb7'/%3E%3Crect x='442' y='403' width='2' height='2' fill='%235c6060'/%3E%3Crect x='235' y='264' width='2' height='2' fill='%238abeb7'/%3E%3Crect x='101' y='98' width='2' height='2' fill='%238abeb7'/%3E%3Crect x='247' y='326' width='2' height='2' fill='%238abeb7'/%3E%3Crect x='410' y='99' width='1' height='1' fill='%23e0e0e0'/%3E%3Crect x='232' y='159' width='1' height='1' fill='%238abeb7'/%3E%3Crect x='50' y='279' width='1' height='1' fill='%23e0e0e0'/%3E%3Crect x='308' y='206' width='2' height='2' fill='%235c6060'/%3E%3Crect x='338' y='382' width='2' height='2' fill='%238abeb7'/%3E%3Crect x='336' y='84' width='2' height='2' fill='%238abeb7'/%3E%3Crect x='11' y='429' width='2' height='2' fill='%238abeb7'/%3E%3C/svg%3E"); }
+.arcade::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='743' height='743' shape-rendering='crispEdges'%3E%3Crect x='641' y='265' width='2' height='2' fill='%23e0e0e0'/%3E%3Crect x='371' y='711' width='2' height='2' fill='%23e0e0e0'/%3E%3Cpath fill='%23ffd700' d='M671 544h2v6h-2zM669 546h6v2h-6z'/%3E%3Crect x='480' y='259' width='2' height='2' fill='%23e0e0e0'/%3E%3Cpath fill='%23ffd700' d='M57 162h2v6h-2zM55 164h6v2h-6z'/%3E%3Cpath fill='%23ffd700' d='M384 482h2v6h-2zM382 484h6v2h-6z'/%3E%3Cpath fill='%23ffd700' d='M393 558h2v6h-2zM391 560h6v2h-6z'/%3E%3Cpath fill='%23ffd700' d='M591 257h2v6h-2zM589 259h6v2h-6z'/%3E%3Cpath fill='%23e0e0e0' d='M225 419h2v6h-2zM223 421h6v2h-6z'/%3E%3C/svg%3E");
+  background-position: 61px 23px; animation: twinkle 3.2s steps(1) infinite; }
+@keyframes twinkle { 0%, 100% { opacity: 1; } 30% { opacity: 0.3; } 45% { opacity: 0.85; } 70% { opacity: 0.15; } 80% { opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) { .arcade::after { animation: none; } }
+
 /* ---------- responsive (keep last so it overrides base rules) ---------- */
 @media (max-width: 760px) {
   .report { padding-top: 48px; }
@@ -354,6 +370,7 @@ table.data td.mono { font-size: 12px; color: var(--muted); letter-spacing: 0.5px
   .term-out { height: 220px; }
   .ach-toast { top: 64px; right: 12px; max-width: calc(100vw - 24px); }
   .avatar-bubble { left: 52px; }
+  .home::before { background-position: 50% 0; background-size: 900px 300px; }
   .talk { bottom: 12px; gap: 12px; padding: 12px 34px 14px 12px; }
   .talk-face { width: 48px; height: 48px; }
   .talk-strip { width: 96px; height: 48px; }
