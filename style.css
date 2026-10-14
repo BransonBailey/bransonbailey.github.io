@@ -212,16 +212,24 @@ table.data td.mono { font-size: 12px; color: var(--muted); letter-spacing: 0.5px
 /* ---------- notched pixel cards ----------
    clip-path would also cut a normal border, so the outline is the card's own background (--o)
    and the panel fill is a ::before inset by the 1px transparent border, notched the same way. */
-.stat-card, .feature, blockquote, .contact a, .explore a, .ach-toast, .about-card {
+.stat-card, .feature, blockquote, .contact a, .explore a, .ach-toast, .about-card, .snd {
   --o: var(--border); position: relative; isolation: isolate;
   border-color: transparent; border-radius: 0; background: var(--o); clip-path: var(--notch);
 }
-.stat-card::before, .feature::before, blockquote::before, .contact a::before, .explore a::before, .ach-toast::before, .about-card::before {
+.stat-card::before, .feature::before, blockquote::before, .contact a::before, .explore a::before, .ach-toast::before, .about-card::before, .snd::before {
   content: ''; position: absolute; inset: 0; z-index: -1; background: var(--panel); clip-path: var(--notch);
 }
 .contact a:hover, .explore a:hover { --o: var(--accent); border-color: transparent; }
 /* clip-path hides focus outlines, so focus lights the pixel outline instead */
 .contact a:focus-visible, .explore a:focus-visible { --o: var(--gold); outline: none; }
+
+/* 8-bit sound toggle (built by console.js) */
+.snd { position: fixed; right: 16px; bottom: 16px; z-index: 40; width: 38px; height: 38px; padding: 8px;
+  border: 1px solid transparent; color: var(--muted); cursor: pointer; }
+.snd svg { display: block; width: 20px; height: 20px; }
+.snd:hover { --o: var(--accent); color: var(--accent-hi); }
+.snd:focus-visible { --o: var(--gold); outline: none; color: var(--accent-hi); }
+.snd[aria-pressed="true"] { color: var(--red); }
 
 /* ---------- contact icons (16x16 grid, same as favicon) ---------- */
 .contact a { display: grid; grid-template-columns: 32px 1fr; column-gap: 14px; align-items: center; }

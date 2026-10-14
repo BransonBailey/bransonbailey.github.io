@@ -45,6 +45,88 @@
   }
   function achName(id) { for (var i = 0; i < ACH.length; i++) if (ACH[i][0] === id) return ACH[i][1]; return id; }
 
+
+  // ---------- 8-bit sound (Web Audio square waves; no audio files) ----------
+  // On by default, but browsers only allow audio after the visitor clicks or types, so nothing
+  // plays on page load. The mute choice is stored in this browser only.
+  var MKEY = "bb-sound", AC = window.AudioContext || window.webkitAudioContext, actx = null, master = null;
+  function soundOn() { return !load(MKEY).off; }
+  function setSound(on) { save(MKEY, { off: !on, ts: Date.now() }); paintSnd(); if (on) sfx("on"); }
+  function audio() {
+    if (!AC || !soundOn()) return null;
+    if (!actx) {
+      try { actx = new AC(); master = actx.createGain(); master.gain.value = 0.05; master.connect(actx.destination); }
+      catch (e) { AC = null; return null; }
+    }
+    return actx;
+  }
+  // notes: [frequency Hz, start s, length s, wave, volume]
+  function tones(notes, delay) {
+    var c = audio();
+    if (!c) return false;
+    var asked = Date.now();
+    function play() {
+      if (Date.now() - asked > 1500) return; // never play a stale sound long after the action
+      var t0 = c.currentTime + 0.01 + (delay || 0);
+      notes.forEach(function (n) {
+        var o = c.createOscillator(), g = c.createGain(), s = t0 + n[1], v = n[4] || 1;
+        o.type = n[3] || "square";
+        o.frequency.setValueAtTime(n[0], s);
+        g.gain.setValueAtTime(0.0001, s);
+        g.gain.exponentialRampToValueAtTime(v, s + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, s + n[2]);
+        o.connect(g); g.connect(master);
+        o.start(s); o.stop(s + n[2] + 0.02);
+      });
+    }
+    if (c.state === "running") play();
+    else { try { c.resume().then(play, function () {}); } catch (e) { return false; } }
+    return true;
+  }
+  var SFX = {
+    open:  [[523, 0, 0.07], [784, 0.06, 0.1]],
+    close: [[784, 0, 0.07], [523, 0.06, 0.1]],
+    enter: [[880, 0, 0.05, "square", 0.5]],
+    link:  [[988, 0, 0.06, "square", 0.6], [1319, 0.05, 0.2, "square", 0.6]],
+    on:    [[660, 0, 0.06, "square", 0.6], [990, 0.06, 0.1, "square", 0.6]],
+    ach:   [[523, 0, 0.1], [659, 0.1, 0.1], [784, 0.2, 0.1], [1047, 0.3, 0.14], [784, 0.45, 0.08], [1047, 0.53, 0.4],
+            [131, 0, 0.3, "triangle", 0.9], [196, 0.3, 0.6, "triangle", 0.9]]
+  };
+  function sfx(name, delay) {
+    if (name === "key") return tones([[1300 + Math.random() * 500, 0, 0.025, "square", 0.25]]);
+    return tones(SFX[name], delay);
+  }
+
+  // Pixel speaker toggle, bottom-right on every page.
+  var snd, SPK = "M2 6h3v4H2zM5 5h1v6H5zM6 4h1v8H6zM7 3h1v10H7z", WAVES = "M10 6h1v4h-1zM12 4h1v8h-1z",
+      XMARK = "M10 6h1v1h-1zM14 6h1v1h-1zM11 7h1v1h-1zM13 7h1v1h-1zM12 8h1v1h-1zM11 9h1v1h-1zM13 9h1v1h-1zM10 10h1v1h-1zM14 10h1v1h-1z";
+  function paintSnd() {
+    if (!snd) return;
+    var on = soundOn();
+    snd.setAttribute("aria-pressed", on ? "false" : "true");
+    snd.title = on ? "Sound on (click to mute)" : "Sound off (click to unmute)";
+    snd.querySelector("path.v").setAttribute("d", on ? WAVES : XMARK);
+  }
+  function buildSnd() {
+    if (!AC) return;
+    var NS = "http://www.w3.org/2000/svg";
+    snd = document.createElement("button");
+    snd.type = "button"; snd.className = "snd";
+    snd.setAttribute("aria-label", "Mute sound effects");
+    var svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 16 16"); svg.setAttribute("shape-rendering", "crispEdges"); svg.setAttribute("aria-hidden", "true");
+    [["", SPK], ["v", WAVES]].forEach(function (p) {
+      var el = document.createElementNS(NS, "path");
+      if (p[0]) el.setAttribute("class", p[0]);
+      el.setAttribute("fill", "currentColor"); el.setAttribute("d", p[1]);
+      svg.appendChild(el);
+    });
+    snd.appendChild(svg);
+    snd.addEventListener("click", function () { setSound(!soundOn()); });
+    document.body.appendChild(snd);
+    paintSnd();
+  }
+
   var queue = [], showing = false;
   function unlock(id) {
     var got = load(AKEY);
@@ -79,6 +161,7 @@
     document.body.appendChild(t);
     t.getBoundingClientRect(); // commit the off-screen position so the slide-in animates
     t.classList.add("show");
+    sfx("ach", 0.12);
     setTimeout(function () {
       t.classList.remove("show");
       setTimeout(function () { t.remove(); nextToast(); }, 400);
@@ -168,7 +251,7 @@
 
   function snapshot(reopen) {
     persist(reopen);
-    return JSON.stringify({ a: load(AKEY), p: load(PKEY), s: load(SKEY, SS) });
+    return JSON.stringify({ a: load(AKEY), p: load(PKEY), s: load(SKEY, SS), m: load(MKEY) });
   }
 
   function carryTo(href, reopen) {
@@ -199,6 +282,8 @@
     for (i = 0; i < ACH.length; i++) if (c.a && c.a[ACH[i][0]] && !got[ACH[i][0]]) got[ACH[i][0]] = +c.a[ACH[i][0]] || Date.now();
     for (i = 0; i < PAGES.length; i++) if (c.p && c.p[PAGES[i]]) pages[PAGES[i]] = 1;
     save(AKEY, got); save(PKEY, pages);
+    var mm = load(MKEY);
+    if (c.m && typeof c.m === "object" && (+c.m.ts || 0) > (+mm.ts || 0)) save(MKEY, { off: !!c.m.off, ts: +c.m.ts });
     var mine = load(SKEY, SS);
     if (c.s && Array.isArray(c.s.lines) && (+c.s.ts || 0) > (+mine.ts || 0)) {
       save(SKEY, {
@@ -230,6 +315,7 @@
        ["cd <home|about|projects|ncl>", "go to a page"],
        ["sudo hire branson", "you know what this does"],
        ["achievements", "show your progress"],
+       ["mute / unmute", "8-bit sound effects off / on"],
        ["clear / exit", "clear the screen / close (or press ` / Esc)"]]
         .forEach(function (c) { line("  " + (c[0] + "                        ").slice(0, 26) + c[1]); });
     },
@@ -279,8 +365,9 @@
       if (!href) { line("cd: " + args[0] + ": No such file or directory", "err"); return; }
       reopenNext = true; persist(true); // the next page picks the shell back up, still open
       if (href.charAt(0) === "#") { location.href = href; return; } // same-document jump (combined preview)
-      close();
-      location.href = carryTo(href, true);
+      close(true);
+      var go = carryTo(href, true);
+      setTimeout(function () { location.href = go; }, sfx("link") ? 160 : 0); // let the blip finish
     },
     sudo: function (args) {
       if (args.join(" ") !== "hire branson") {
@@ -311,6 +398,11 @@
       line(n === ACH.length ? "100% complete. Thanks for playing." : "Progress is saved in this browser only.", n === ACH.length ? "hi" : "dim");
     },
     clear: function () { out.textContent = ""; persist(false); },
+    mute: function () { setSound(false); line("Sound off. Type 'unmute' to turn it back on.", "dim"); },
+    unmute: function () {
+      if (!AC) { line("unmute: this browser has no Web Audio support", "err"); return; }
+      setSound(true); line("Sound on.", "dim");
+    },
     exit: function () { close(); }
   };
 
@@ -338,7 +430,7 @@
     var x = document.createElement("button");
     x.type = "button"; x.className = "term-x"; x.textContent = "\u00d7";
     x.setAttribute("aria-label", "Close terminal");
-    x.addEventListener("click", close);
+    x.addEventListener("click", function () { close(); });
     bar.appendChild(x);
 
     out = document.createElement("div");
@@ -359,7 +451,8 @@
     document.body.appendChild(root);
 
     input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); if (!busy) { run(input.value); input.value = ""; } }
+      if (e.key === "Enter") { e.preventDefault(); if (!busy) { sfx("enter"); run(input.value); input.value = ""; } }
+      else if (!e.repeat && e.key !== "`" && (e.key.length === 1 || e.key === "Backspace" || e.key === "Delete")) sfx("key");
       else if (e.key === "ArrowUp" && hpos > 0) { e.preventDefault(); input.value = hist[--hpos]; }
       else if (e.key === "ArrowDown") { e.preventDefault(); hpos = Math.min(hist.length, hpos + 1); input.value = hist[hpos] || ""; }
     });
@@ -371,16 +464,19 @@
     lastFocus = document.activeElement;
     root.hidden = false;
     input.focus();
+    sfx("open");
     unlock("shell");
   }
 
-  function close() {
+  function close(silent) {
     if (!root || root.hidden) return;
     root.hidden = true;
+    if (silent !== true) sfx("close");
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
 
   mergeCarried();
+  buildSnd();
   visit();
   // Resume the shell if the visitor left this tab's last page with it open (e.g. via cd).
   if (load(SKEY, SS).open) {
@@ -400,13 +496,21 @@
     if (root) restore();
   });
   // Plain links between the site's own pages (nav bar, buttons) carry the state as well.
+  // Every link click gets a blip; same-tab page loads wait ~150 ms so the sound isn't cut off.
   document.addEventListener("click", function (e) {
-    if (!FILE || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    if (e.defaultPrevented || e.button !== 0) return;
     var a = e.target.closest && e.target.closest("a[href]");
-    if (!a || a.target === "_blank" || a.protocol !== "file:" || a.pathname === location.pathname) return;
-    if (!/(\.html|\/)$/.test(a.pathname)) return; // only pages, not the PDF or other files
+    if (!a) return;
+    var played = sfx("link");
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || a.target === "_blank" || a.hasAttribute("download")) return;
+    if (!/^(https?|file):$/.test(a.protocol)) return; // mailto: etc. don't unload the page
+    if (a.pathname === location.pathname && a.host === location.host) return; // in-page #jumps
+    var href = a.href;
+    if (FILE && a.protocol === "file:" && /(\.html|\/)$/.test(a.pathname)) {
+      href = carryTo(a.href.split("#")[0] + (a.hash || ""), false); // only pages, not the PDF or other files
+    } else if (!played) return;
     e.preventDefault();
-    location.href = carryTo(a.href.split("#")[0] + (a.hash || ""), false);
+    setTimeout(function () { location.href = href; }, played ? 150 : 0);
   });
   window.addEventListener("hashchange", visit); // the combined preview switches pages by #hash
 
