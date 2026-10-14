@@ -60,13 +60,21 @@
     }
     return actx;
   }
+  // Achievements unlocked on page load (Grand tour, Game over) fire before the visitor has
+  // clicked or typed on that page, when the browser still holds audio back. Those sounds wait
+  // for the first click/key and play then, as long as it's within a few seconds.
+  var pend = [];
+  function flush() { var p = pend; pend = []; p.forEach(function (f) { f(); }); }
+  function wake() { if (actx && actx.state !== "running") { try { actx.resume().then(flush, function () {}); } catch (e) {} } }
+  ["pointerdown", "keydown", "touchend"].forEach(function (ev) { document.addEventListener(ev, wake, true); });
+
   // notes: [frequency Hz, start s, length s, wave, volume]
-  function tones(notes, delay) {
+  function tones(notes, delay, maxWait) {
     var c = audio();
     if (!c) return false;
     var asked = Date.now();
     function play() {
-      if (Date.now() - asked > 1500) return; // never play a stale sound long after the action
+      if (Date.now() - asked > (maxWait || 1500)) return; // never play a stale sound long after the action
       var t0 = c.currentTime + 0.01 + (delay || 0);
       notes.forEach(function (n) {
         var o = c.createOscillator(), g = c.createGain(), s = t0 + n[1], v = n[4] || 1;
@@ -79,22 +87,22 @@
         o.start(s); o.stop(s + n[2] + 0.02);
       });
     }
-    if (c.state === "running") play();
-    else { try { c.resume().then(play, function () {}); } catch (e) { return false; } }
-    return true;
+    if (c.state === "running") { play(); return true; }
+    pend.push(play);
+    try { c.resume().then(flush, function () {}); } catch (e) {}
+    return false; // not audible yet, so callers shouldn't hold up navigation for it
   }
   var SFX = {
     open:  [[523, 0, 0.07], [784, 0.06, 0.1]],
     close: [[784, 0, 0.07], [523, 0.06, 0.1]],
     enter: [[880, 0, 0.05, "square", 0.5]],
-    link:  [[988, 0, 0.06, "square", 0.6], [1319, 0.05, 0.2, "square", 0.6]],
+    link:  [[660, 0, 0.035, "triangle", 0.5]],
     on:    [[660, 0, 0.06, "square", 0.6], [990, 0.06, 0.1, "square", 0.6]],
-    ach:   [[523, 0, 0.1], [659, 0.1, 0.1], [784, 0.2, 0.1], [1047, 0.3, 0.14], [784, 0.45, 0.08], [1047, 0.53, 0.4],
-            [131, 0, 0.3, "triangle", 0.9], [196, 0.3, 0.6, "triangle", 0.9]]
+    ach:   [[988, 0, 0.08], [1319, 0.08, 0.35]] // coin: B5 -> E6
   };
   function sfx(name, delay) {
     if (name === "key") return tones([[1300 + Math.random() * 500, 0, 0.025, "square", 0.25]]);
-    return tones(SFX[name], delay);
+    return tones(SFX[name], delay, name === "ach" ? 4000 : 0);
   }
 
   // Pixel speaker toggle, bottom-right on every page.
