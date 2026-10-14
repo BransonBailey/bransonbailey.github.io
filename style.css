@@ -184,6 +184,17 @@ blockquote footer strong { color: var(--fg); }
 .term-out a { color: var(--accent-hi); }
 .term-row { display: flex; padding: 4px 12px 10px; color: var(--accent-hi); white-space: pre; cursor: text; }
 .term-row input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--fg); font: inherit; caret-color: var(--gold); padding: 0; }
+.term-out[hidden], .term-row[hidden] { display: none; }
+.snake { padding: 10px 12px 12px; }
+.snake-hud { display: flex; justify-content: space-between; color: var(--gold); letter-spacing: 1px; margin-bottom: 8px; }
+.snake-stat { color: var(--accent-hi); white-space: pre; }
+.snake canvas { display: block; margin: 0 auto; border: 1px solid var(--border); touch-action: none; outline: none; }
+.snake canvas:focus-visible { border-color: var(--accent); }
+.snake-tip { margin-top: 8px; color: var(--muted); font-size: 11px; text-align: center; white-space: pre; }
+.snake-pad { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+.snake-pad button { min-width: 44px; height: 40px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--accent-hi); font: inherit; font-size: 15px; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.snake-pad button:active { border-color: var(--accent); color: var(--gold); }
 
 /* ---------- responsive ---------- */
 @media (prefers-reduced-motion: reduce) {

@@ -22,7 +22,8 @@
     ["shell", "Found the shell", "Open the terminal"],
     ["tour", "Grand tour", "Visit all four pages"],
     ["hire", "Root access", "Run sudo hire branson"],
-    ["lost", "Game over", "Find a page that doesn't exist"]
+    ["lost", "Game over", "Find a page that doesn't exist"],
+    ["snake", "Snake charmer", "Score 10 in snake"]
   ];
   var AKEY = "bb-achievements", PKEY = "bb-pages-v2", PAGES = ["home", "about", "projects", "ncl"];
   var TROPHY = "M2 1h12v1h-12zM0 2h16v1h-16zM0 3h1v1h-1zM2 3h12v1h-12zM15 3h1v1h-1zM0 4h1v1h-1zM2 4h12v1h-12zM15 4h1v1h-1zM1 5h1v1h-1zM3 5h10v1h-10zM14 5h1v1h-1zM2 6h12v1h-12zM4 7h8v1h-8zM5 8h6v1h-6zM6 9h4v1h-4zM7 10h2v1h-2zM7 11h2v1h-2zM5 12h6v1h-6zM4 13h8v1h-8zM4 14h8v1h-8z";
@@ -97,7 +98,9 @@
     enter: [[880, 0, 0.05, "square", 0.5]],
     tick:  [[600, 0, 0.03, "square", 0.7]],
     on:    [[660, 0, 0.06, "square", 0.6], [990, 0.06, 0.1, "square", 0.6]],
-    ach:   [[988, 0, 0.08], [1319, 0.08, 0.35]] // coin: B5 -> E6
+    ach:   [[988, 0, 0.08], [1319, 0.08, 0.35]], // coin: B5 -> E6
+    eat:   [[740, 0, 0.04, "square", 0.6], [988, 0.04, 0.05, "square", 0.6]],
+    die:   [[392, 0, 0.1], [294, 0.1, 0.1], [196, 0.2, 0.28]]
   };
   function sfx(name, delay) {
     if (name === "key") return tones([[1300 + Math.random() * 500, 0, 0.025, "square", 0.25]]);
@@ -330,6 +333,167 @@
     return !!st.open;
   }
 
+  // ---------- snake (type 'snake') ----------
+  // Drawn on a canvas inside the terminal. Best score is kept in this browser only.
+  var NKEY = "bb-snake", game = null;
+  function cssVar(v, d) { var x = getComputedStyle(document.documentElement).getPropertyValue(v).trim(); return x || d; }
+
+  function snake() {
+    if (game) return;
+    var mm = window.matchMedia ? function (q) { return matchMedia(q).matches; } : function () { return false; };
+    var reduce = mm("(prefers-reduced-motion: reduce)"), coarse = mm("(pointer: coarse)");
+    var row = root.querySelector(".term-row");
+    var avail = out.clientWidth - 24;
+    var cols = avail < 480 ? 20 : 30, rows = 14;
+    var cell = Math.max(8, Math.floor(Math.min(avail / cols, 224 / rows)));
+    var Wpx = cols * cell, Hpx = rows * cell, dpr = Math.min(window.devicePixelRatio || 1, 3);
+    var C = { bg: cssVar("--bg", "#0a0a0a"), dot: cssVar("--rule", "#1e1e1e"), body: cssVar("--accent", "#5c8a8a"),
+              head: cssVar("--accent-hi", "#8abeb7"), food: cssVar("--gold", "#ffd700"), red: cssVar("--red", "#c43e1c") };
+
+    var wrap = document.createElement("div"); wrap.className = "snake";
+    var hud = document.createElement("div"); hud.className = "snake-hud";
+    var title = document.createElement("span"); title.textContent = "SNAKE";
+    var stat = document.createElement("span"); stat.className = "snake-stat";
+    hud.appendChild(title); hud.appendChild(stat);
+    var cv = document.createElement("canvas");
+    cv.width = Wpx * dpr; cv.height = Hpx * dpr;
+    cv.style.width = Wpx + "px"; cv.style.height = Hpx + "px";
+    cv.tabIndex = 0; cv.setAttribute("role", "img"); cv.setAttribute("aria-label", "Snake game");
+    var tip = document.createElement("div"); tip.className = "snake-tip";
+    tip.textContent = coarse ? "swipe or use the arrows" : "arrows / WASD move   P pause   Q or Esc quit";
+    wrap.appendChild(hud); wrap.appendChild(cv);
+    if (coarse) {
+      var pad = document.createElement("div"); pad.className = "snake-pad";
+      [["\u2190", [-1, 0], "Left"], ["\u2191", [0, -1], "Up"], ["\u2193", [0, 1], "Down"], ["\u2192", [1, 0], "Right"], ["quit", null, "Quit snake"]]
+        .forEach(function (b) {
+          var el = document.createElement("button");
+          el.type = "button"; el.textContent = b[0]; el.setAttribute("aria-label", b[2]);
+          el.addEventListener("pointerdown", function (e) { e.preventDefault(); b[1] ? turn(b[1]) : end(true); });
+          pad.appendChild(el);
+        });
+      wrap.appendChild(pad);
+    }
+    wrap.appendChild(tip);
+    root.insertBefore(wrap, row);
+    out.hidden = true; row.hidden = true; busy = true;
+
+    var ctx = cv.getContext("2d");
+    ctx.scale(dpr, dpr);
+    var best = +load(NKEY).best || 0, body, dir, q, food, score, started, paused, over, timer;
+
+    function reset() {
+      var cy = rows >> 1;
+      body = [[4, cy], [3, cy], [2, cy]]; dir = [1, 0]; q = [];
+      score = 0; started = false; paused = false; over = false;
+      place(); paint(); draw();
+    }
+    function occupied(x, y, n) { for (var i = 0; i < n; i++) if (body[i][0] === x && body[i][1] === y) return true; return false; }
+    function place() {
+      var free = [];
+      for (var y = 0; y < rows; y++) for (var x = 0; x < cols; x++) if (!occupied(x, y, body.length)) free.push([x, y]);
+      food = free.length ? free[Math.floor(Math.random() * free.length)] : null;
+    }
+    function delay() { return reduce ? 170 : Math.max(65, 125 - score * 3); }
+    function loop() { timer = setTimeout(function () { step(); if (started && !paused && !over) loop(); }, delay()); }
+    function turn(d) {
+      if (over) return;
+      var last = q.length ? q[q.length - 1] : dir;
+      if (!started) { started = true; if (d[0] !== -dir[0] || d[1] !== -dir[1]) q.push(d); paint(); draw(); loop(); return; }
+      if (paused) { paused = false; paint(); loop(); }
+      if ((d[0] === last[0] && d[1] === last[1]) || (d[0] === -last[0] && d[1] === -last[1]) || q.length > 2) return;
+      q.push(d);
+    }
+    function step() {
+      if (q.length) dir = q.shift();
+      var h = body[0], nx = h[0] + dir[0], ny = h[1] + dir[1];
+      var eat = food && nx === food[0] && ny === food[1];
+      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows || occupied(nx, ny, eat ? body.length : body.length - 1)) return die();
+      body.unshift([nx, ny]);
+      if (eat) {
+        score++; sfx("eat");
+        if (score >= 10) unlock("snake");
+        place();
+        if (!food) return die(true);
+      } else body.pop();
+      paint(); draw();
+    }
+    function die(won) {
+      over = true; clearTimeout(timer);
+      var record = score > best;
+      if (record) { best = score; save(NKEY, { best: best, ts: Date.now() }); }
+      sfx(won ? "ach" : "die");
+      if (record && !won) setTimeout(function () { sfx("ach"); }, 520);
+      paint(); draw(won ? "YOU WIN" : "GAME OVER", record ? "new best: " + best : "score " + score,
+        coarse ? "tap to play again" : "Enter to play again");
+    }
+    function pause() {
+      if (!started || over || paused) return;
+      paused = true; clearTimeout(timer); paint(); draw("PAUSED", coarse ? "swipe to resume" : "P or an arrow to resume");
+    }
+    function paint() { stat.textContent = "score " + score + "   best " + best; }
+    function banner(lines) {
+      ctx.fillStyle = "rgba(10,10,10,0.78)";
+      ctx.fillRect(0, Hpx / 2 - 30, Wpx, 60);
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      lines.forEach(function (t, i) {
+        if (!t) return;
+        ctx.font = (i ? "10px" : "14px") + " Monocraft, monospace";
+        ctx.fillStyle = i ? C.head : C.food;
+        ctx.fillText(t, Wpx / 2, Hpx / 2 - 14 + i * 15);
+      });
+    }
+    function draw(a, b, c) {
+      ctx.fillStyle = C.bg; ctx.fillRect(0, 0, Wpx, Hpx);
+      ctx.fillStyle = C.dot;
+      for (var y = 0; y < rows; y++) for (var x = 0; x < cols; x++) ctx.fillRect(x * cell + (cell >> 1), y * cell + (cell >> 1), 1, 1);
+      if (food) {
+        var p = Math.max(2, cell >> 2);
+        ctx.fillStyle = C.food; ctx.fillRect(food[0] * cell + p, food[1] * cell + p, cell - 2 * p, cell - 2 * p);
+      }
+      for (var i = body.length - 1; i >= 0; i--) {
+        ctx.fillStyle = i ? C.body : (over ? C.red : C.head);
+        ctx.fillRect(body[i][0] * cell + 1, body[i][1] * cell + 1, cell - 2, cell - 2);
+      }
+      var e = Math.max(2, cell >> 3), hx = body[0][0] * cell, hy = body[0][1] * cell, m = cell >> 1;
+      ctx.fillStyle = C.bg; // eyes face the direction of travel
+      if (dir[0]) { var ex = hx + (dir[0] > 0 ? cell - 2 * e - 1 : e + 1); ctx.fillRect(ex, hy + m - 2 * e, e, e); ctx.fillRect(ex, hy + m + e, e, e); }
+      else { var ey = hy + (dir[1] > 0 ? cell - 2 * e - 1 : e + 1); ctx.fillRect(hx + m - 2 * e, ey, e, e); ctx.fillRect(hx + m + e, ey, e, e); }
+      if (a) banner([a, b, c]);
+      else if (!started) banner(["READY", coarse ? "swipe to start" : "press an arrow key to start"]);
+    }
+    function end(focus) {
+      if (!game) return;
+      clearTimeout(timer); game = null; busy = false;
+      wrap.remove(); out.hidden = false; row.hidden = false;
+      line("snake: score " + score + " | best " + best, "dim");
+      if (focus) input.focus();
+    }
+
+    var KEYS = { arrowup: [0, -1], w: [0, -1], arrowdown: [0, 1], s: [0, 1], arrowleft: [-1, 0], a: [-1, 0], arrowright: [1, 0], d: [1, 0] };
+    cv.addEventListener("keydown", function (e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      var k = e.key.toLowerCase();
+      if (KEYS[k]) { e.preventDefault(); turn(KEYS[k]); }
+      else if (k === "q" || k === "escape") { e.preventDefault(); e.stopPropagation(); end(true); }
+      else if (k === "p" || k === " ") { e.preventDefault(); paused ? turn(dir) : pause(); }
+      else if ((k === "enter" || k === "r") && over) { e.preventDefault(); reset(); }
+    });
+    cv.addEventListener("blur", function () { if (!coarse) pause(); });
+    var t0 = null;
+    cv.addEventListener("touchstart", function (e) { var t = e.changedTouches[0]; t0 = [t.clientX, t.clientY]; }, { passive: true });
+    cv.addEventListener("touchend", function (e) {
+      if (!t0) return;
+      var t = e.changedTouches[0], dx = t.clientX - t0[0], dy = t.clientY - t0[1]; t0 = null;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) { if (over) reset(); return; }
+      turn(Math.abs(dx) > Math.abs(dy) ? [dx > 0 ? 1 : -1, 0] : [0, dy > 0 ? 1 : -1]);
+    });
+    cv.addEventListener("click", function () { if (over) reset(); });
+
+    game = { end: end };
+    reset();
+    try { cv.focus({ preventScroll: true }); } catch (e) { cv.focus(); }
+  }
+
   var COMMANDS = {
     help: function () {
       [["whoami", "who runs this box"],
@@ -338,6 +502,7 @@
        ["cd <home|about|projects|ncl>", "go to a page"],
        ["sudo hire branson", "you know what this does"],
        ["achievements", "show your progress"],
+       ["snake", "play snake (arrows / WASD)"],
        ["mute / unmute", "8-bit sound effects off / on"],
        ["clear / exit", "clear the screen / close (or press ` / Esc)"]]
         .forEach(function (c) { line("  " + (c[0] + "                        ").slice(0, 26) + c[1]); });
@@ -426,6 +591,7 @@
       if (!AC) { line("unmute: this browser has no Web Audio support", "err"); return; }
       setSound(true); line("Sound on.", "dim");
     },
+    snake: function () { snake(); },
     exit: function () { close(); }
   };
 
@@ -493,6 +659,7 @@
 
   function close(silent) {
     if (!root || root.hidden) return;
+    if (game) game.end(false);
     root.hidden = true;
     if (silent !== true) sfx("close");
     if (lastFocus && lastFocus.focus) lastFocus.focus();
