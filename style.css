@@ -198,6 +198,8 @@ blockquote footer strong { color: var(--fg); }
 /* ---------- multi-page additions ---------- */
 .lede a { color: var(--fg); font-weight: 700; }
 .lede a:hover { color: var(--gold); }
+.lede a.more { color: var(--accent-hi); font-size: 13px; font-weight: 400; }
+.lede a.more:hover { color: var(--gold); }
 .explore { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .explore a { display: block; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 18px; color: var(--fg); }
 .explore a:hover { border-color: var(--accent); color: var(--fg); }
