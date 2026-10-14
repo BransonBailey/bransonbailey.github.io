@@ -1,0 +1,38 @@
+# Refreshes the About page bookshelf from Goodreads once a day (and on demand from the Actions tab).
+# Commits only when the shelf actually changed, then asks Pages to rebuild.
+name: Update bookshelf
+
+on:
+  schedule:
+    - cron: "17 10 * * *" # daily, ~6am Eastern
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: bookshelf
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pillow==11.3.0
+      - run: python .github/scripts/reading.py
+      - name: Commit and rebuild Pages if the shelf changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add about/index.html books
+          if git diff --cached --quiet; then echo "Shelf unchanged"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Bookshelf: update from Goodreads"
+          git push
+          gh api -X POST "repos/${{ github.repository }}/pages/builds" || echo "Pages rebuild request failed; the push should still trigger one"
