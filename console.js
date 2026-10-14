@@ -264,7 +264,7 @@
         ["  Help Desk Support Specialist  Anderson University     May 2024 - Dec 2024", null, 120],
         ["  Player                        National Cyber League   Oct 2023 - Apr 2026", null, 120],
         ["Education", "hi", 120],
-        ["  B.S. Cybersecurity, Anderson University (SC), 2023 - 2027, GPA 3.88", null, 120],
+        ["  B.S. Cybersecurity, Anderson University (SC), 2023 - Dec 2026, GPA 3.88", null, 120],
         ["Certifications", "hi", 120],
         ["  CompTIA CSAP, CySA+, Security+  |  AWS Certified Cloud Practitioner", null, 120],
         ["Highlights", "hi", 120],
