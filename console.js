@@ -65,8 +65,21 @@
   // Wake the audio engine on the visitor's first press/key on each page, so the sound for
   // that same click is audible. Before any interaction the browser may keep audio locked;
   // sounds asked for then are dropped rather than saved up and played on a later click.
-  function prime() { var c = audio(); if (c && c.state !== "running") { try { c.resume(); } catch (e) {} } }
-  ["pointerdown", "keydown", "touchend"].forEach(function (ev) { document.addEventListener(ev, prime, true); });
+  // iPhone/iPad Safari only unlocks audio on touchend/click (not touchstart/pointerdown), and only
+  // if something actually plays inside that handler, so a one-sample silent buffer is started too.
+  function prime() {
+    var c = audio();
+    if (!c || c.state === "running") return;
+    try {
+      c.resume();
+      var b = c.createBufferSource();
+      b.buffer = c.createBuffer(1, 1, 22050);
+      b.connect(c.destination); b.start(0);
+    } catch (e) {}
+  }
+  ["pointerdown", "keydown", "touchend", "click"].forEach(function (ev) { document.addEventListener(ev, prime, true); });
+  // Safari can leave audio "interrupted" after the tab comes back from the background.
+  window.addEventListener("pageshow", function () { if (actx && actx.state !== "running") { try { actx.resume(); } catch (e) {} } });
 
   // notes: [frequency Hz, start s, length s, wave, volume]
   // Returns true when the sound will be heard (so link clicks can wait for it to finish).
@@ -190,7 +203,8 @@
       try { localStorage.setItem("bb-coin", String(Date.now())); } catch (e) {}
       return 450;
     }
-    return sfx("tick") ? 90 : 0;
+    if (!sfx("tick")) return 0;
+    return actx && actx.state === "running" ? 90 : 250; // first tap on a page: give the unlock time to start the sound
   }
 
   // Which page is this? 404 marks itself; others use the visible nav link marked aria-current.
