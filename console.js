@@ -60,49 +60,48 @@
     }
     return actx;
   }
-  // Achievements unlocked on page load (Grand tour, Game over) fire before the visitor has
-  // clicked or typed on that page, when the browser still holds audio back. Those sounds wait
-  // for the first click/key and play then, as long as it's within a few seconds.
-  var pend = [];
-  function flush() { var p = pend; pend = []; p.forEach(function (f) { f(); }); }
-  function wake() { if (actx && actx.state !== "running") { try { actx.resume().then(flush, function () {}); } catch (e) {} } }
-  ["pointerdown", "keydown", "touchend"].forEach(function (ev) { document.addEventListener(ev, wake, true); });
+  // Wake the audio engine on the visitor's first press/key on each page, so the sound for
+  // that same click is audible. Before any interaction the browser may keep audio locked;
+  // sounds asked for then are dropped rather than saved up and played on a later click.
+  function prime() { var c = audio(); if (c && c.state !== "running") { try { c.resume(); } catch (e) {} } }
+  ["pointerdown", "keydown", "touchend"].forEach(function (ev) { document.addEventListener(ev, prime, true); });
 
   // notes: [frequency Hz, start s, length s, wave, volume]
-  function tones(notes, delay, maxWait) {
+  // Returns true when the sound will be heard (so link clicks can wait for it to finish).
+  function tones(notes, delay) {
     var c = audio();
     if (!c) return false;
     var asked = Date.now();
     function play() {
-      if (Date.now() - asked > (maxWait || 1500)) return; // never play a stale sound long after the action
-      var t0 = c.currentTime + 0.01 + (delay || 0);
+      if (Date.now() - asked > 400) return; // too late to match the action; skip it
+      var t0 = c.currentTime + 0.005 + (delay || 0);
       notes.forEach(function (n) {
         var o = c.createOscillator(), g = c.createGain(), s = t0 + n[1], v = n[4] || 1;
         o.type = n[3] || "square";
         o.frequency.setValueAtTime(n[0], s);
         g.gain.setValueAtTime(0.0001, s);
-        g.gain.exponentialRampToValueAtTime(v, s + 0.005);
+        g.gain.exponentialRampToValueAtTime(v, s + 0.004);
         g.gain.exponentialRampToValueAtTime(0.0001, s + n[2]);
         o.connect(g); g.connect(master);
         o.start(s); o.stop(s + n[2] + 0.02);
       });
     }
     if (c.state === "running") { play(); return true; }
-    pend.push(play);
-    try { c.resume().then(flush, function () {}); } catch (e) {}
-    return false; // not audible yet, so callers shouldn't hold up navigation for it
+    try { c.resume().then(play, function () {}); } catch (e) { return false; }
+    var ua = navigator.userActivation;
+    return !!(ua && ua.isActive); // inside a click/key the resume goes through
   }
   var SFX = {
     open:  [[523, 0, 0.07], [784, 0.06, 0.1]],
     close: [[784, 0, 0.07], [523, 0.06, 0.1]],
     enter: [[880, 0, 0.05, "square", 0.5]],
-    link:  [[660, 0, 0.035, "triangle", 0.5]],
+    tick:  [[600, 0, 0.03, "square", 0.7]],
     on:    [[660, 0, 0.06, "square", 0.6], [990, 0.06, 0.1, "square", 0.6]],
     ach:   [[988, 0, 0.08], [1319, 0.08, 0.35]] // coin: B5 -> E6
   };
   function sfx(name, delay) {
     if (name === "key") return tones([[1300 + Math.random() * 500, 0, 0.025, "square", 0.25]]);
-    return tones(SFX[name], delay, name === "ach" ? 4000 : 0);
+    return tones(SFX[name], delay);
   }
 
   // Pixel speaker toggle, bottom-right on every page.
@@ -169,11 +168,27 @@
     document.body.appendChild(t);
     t.getBoundingClientRect(); // commit the off-screen position so the slide-in animates
     t.classList.add("show");
-    sfx("ach", 0.12);
+    if (!(name === achName("tour") && Date.now() - (+lsGet("bb-coin") || 0) < 5000)) sfx("ach");
     setTimeout(function () {
       t.classList.remove("show");
       setTimeout(function () { t.remove(); nextToast(); }, 400);
     }, 3800);
+  }
+
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  // Sound for a click that loads another page; returns how long to wait so it isn't cut off.
+  // If that page is the last one needed for Grand tour, play the coin now, while the click
+  // still lets the browser make sound (the next page can't until the visitor interacts).
+  function navSound(url) {
+    var base = String(url).split(/[?#]/)[0], links = document.querySelectorAll(".nav-links a"), p = null;
+    for (var i = 0; i < links.length; i++) if (links[i].href.split(/[?#]/)[0] === base) p = links[i].textContent.trim().toLowerCase();
+    var v = load(PKEY);
+    if (p && PAGES.indexOf(p) >= 0 && !load(AKEY).tour && PAGES.every(function (x) { return x === p || v[x]; }) && sfx("ach")) {
+      try { localStorage.setItem("bb-coin", String(Date.now())); } catch (e) {}
+      return 450;
+    }
+    return sfx("tick") ? 90 : 0;
   }
 
   // Which page is this? 404 marks itself; others use the visible nav link marked aria-current.
@@ -375,7 +390,7 @@
       if (href.charAt(0) === "#") { location.href = href; return; } // same-document jump (combined preview)
       close(true);
       var go = carryTo(href, true);
-      setTimeout(function () { location.href = go; }, sfx("link") ? 160 : 0); // let the blip finish
+      setTimeout(function () { location.href = go; }, navSound(go)); // let the sound finish
     },
     sudo: function (args) {
       if (args.join(" ") !== "hire branson") {
@@ -504,21 +519,23 @@
     if (root) restore();
   });
   // Plain links between the site's own pages (nav bar, buttons) carry the state as well.
-  // Every link click gets a blip; same-tab page loads wait ~150 ms so the sound isn't cut off.
+  // Clicking a link or button ticks; same-tab page loads wait a moment so the sound isn't cut off.
   document.addEventListener("click", function (e) {
-    if (e.defaultPrevented || e.button !== 0) return;
-    var a = e.target.closest && e.target.closest("a[href]");
-    if (!a) return;
-    var played = sfx("link");
-    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || a.target === "_blank" || a.hasAttribute("download")) return;
-    if (!/^(https?|file):$/.test(a.protocol)) return; // mailto: etc. don't unload the page
-    if (a.pathname === location.pathname && a.host === location.host) return; // in-page #jumps
+    if (e.defaultPrevented || e.button !== 0 || !e.target.closest) return;
+    var a = e.target.closest("a[href], button, summary, [role=button]");
+    if (!a || a.closest(".snd, .term")) return; // the speaker and terminal have their own sounds
+    var leaves = a.matches("a[href]") && !(e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || a.target === "_blank" || a.hasAttribute("download"))
+      && /^(https?|file):$/.test(a.protocol) // mailto: etc. don't unload the page
+      && !(a.pathname === location.pathname && a.host === location.host); // in-page #jumps
+    if (!leaves) { sfx("tick"); return; }
     var href = a.href;
     if (FILE && a.protocol === "file:" && /(\.html|\/)$/.test(a.pathname)) {
       href = carryTo(a.href.split("#")[0] + (a.hash || ""), false); // only pages, not the PDF or other files
-    } else if (!played) return;
+    }
+    var wait = navSound(href);
+    if (!wait && href === a.href) return;
     e.preventDefault();
-    setTimeout(function () { location.href = href; }, played ? 150 : 0);
+    setTimeout(function () { location.href = href; }, wait);
   });
   window.addEventListener("hashchange", visit); // the combined preview switches pages by #hash
 
