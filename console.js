@@ -49,9 +49,7 @@
   // ---------- 8-bit sound (Web Audio square waves; no audio files) ----------
   // On by default, but browsers only allow audio after the visitor clicks or types, so nothing
   // plays on page load. The mute choice is stored in this browser only.
-  // Desktop only: phones and tablets (touch screen, no mouse) get no sound and no speaker button.
-  var MOBILE = !!(window.matchMedia && matchMedia("(hover: none) and (pointer: coarse)").matches);
-  var MKEY = "bb-sound", AC = MOBILE ? null : (window.AudioContext || window.webkitAudioContext), actx = null, master = null;
+  var MKEY = "bb-sound", AC = window.AudioContext || window.webkitAudioContext, actx = null, master = null;
   function soundOn() { return !load(MKEY).off; }
   function setSound(on) { save(MKEY, { off: !on, ts: Date.now() }); paintSnd(); if (on) sfx("on"); }
   function audio() {
@@ -65,21 +63,8 @@
   // Wake the audio engine on the visitor's first press/key on each page, so the sound for
   // that same click is audible. Before any interaction the browser may keep audio locked;
   // sounds asked for then are dropped rather than saved up and played on a later click.
-  // iPhone/iPad Safari only unlocks audio on touchend/click (not touchstart/pointerdown), and only
-  // if something actually plays inside that handler, so a one-sample silent buffer is started too.
-  function prime() {
-    var c = audio();
-    if (!c || c.state === "running") return;
-    try {
-      c.resume();
-      var b = c.createBufferSource();
-      b.buffer = c.createBuffer(1, 1, 22050);
-      b.connect(c.destination); b.start(0);
-    } catch (e) {}
-  }
-  ["pointerdown", "keydown", "touchend", "click"].forEach(function (ev) { document.addEventListener(ev, prime, true); });
-  // Safari can leave audio "interrupted" after the tab comes back from the background.
-  window.addEventListener("pageshow", function () { if (actx && actx.state !== "running") { try { actx.resume(); } catch (e) {} } });
+  function prime() { var c = audio(); if (c && c.state !== "running") { try { c.resume(); } catch (e) {} } }
+  ["pointerdown", "keydown", "touchend"].forEach(function (ev) { document.addEventListener(ev, prime, true); });
 
   // notes: [frequency Hz, start s, length s, wave, volume]
   // Returns true when the sound will be heard (so link clicks can wait for it to finish).
@@ -203,8 +188,7 @@
       try { localStorage.setItem("bb-coin", String(Date.now())); } catch (e) {}
       return 450;
     }
-    if (!sfx("tick")) return 0;
-    return actx && actx.state === "running" ? 90 : 250; // first tap on a page: give the unlock time to start the sound
+    return sfx("tick") ? 90 : 0;
   }
 
   // Which page is this? 404 marks itself; others use the visible nav link marked aria-current.
@@ -439,7 +423,7 @@
     clear: function () { out.textContent = ""; persist(false); },
     mute: function () { setSound(false); line("Sound off. Type 'unmute' to turn it back on.", "dim"); },
     unmute: function () {
-      if (!AC) { line(MOBILE ? "unmute: sound effects are desktop-only" : "unmute: this browser has no Web Audio support", "err"); return; }
+      if (!AC) { line("unmute: this browser has no Web Audio support", "err"); return; }
       setSound(true); line("Sound on.", "dim");
     },
     exit: function () { close(); }
