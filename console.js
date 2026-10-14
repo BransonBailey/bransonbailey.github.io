@@ -292,7 +292,7 @@
         ["Verifying credentials...", "dim", 500],
         ["  [ok] CompTIA CSAP, CySA+, Security+", "ok", 220],
         ["  [ok] AWS Certified Cloud Practitioner", "ok", 220],
-        ["  [ok] NCL Top 0.4% nationally", "ok", 220],
+        ["  [ok] NCL Top 2.4% individual, Top 0.4% team", "ok", 220],
         ["  [ok] Real-world pen test experience", "ok", 220],
         ["  [ok] References available (see Recommendation)", "ok", 400],
         ["Access granted. Starting hire sequence...", "hi", 300]
