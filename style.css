@@ -210,11 +210,11 @@ table.data td.mono { font-size: 12px; color: var(--muted); letter-spacing: 0.5px
 /* ---------- notched pixel cards ----------
    clip-path would also cut a normal border, so the outline is the card's own background (--o)
    and the panel fill is a ::before inset by the 1px transparent border, notched the same way. */
-.stat-card, .feature, blockquote, .contact a, .explore a, .ach-toast {
+.stat-card, .feature, blockquote, .contact a, .explore a, .ach-toast, .about-card {
   --o: var(--border); position: relative; isolation: isolate;
   border-color: transparent; border-radius: 0; background: var(--o); clip-path: var(--notch);
 }
-.stat-card::before, .feature::before, blockquote::before, .contact a::before, .explore a::before, .ach-toast::before {
+.stat-card::before, .feature::before, blockquote::before, .contact a::before, .explore a::before, .ach-toast::before, .about-card::before {
   content: ''; position: absolute; inset: 0; z-index: -1; background: var(--panel); clip-path: var(--notch);
 }
 .contact a:hover, .explore a:hover { --o: var(--accent); border-color: transparent; }
@@ -260,6 +260,14 @@ table.data td.mono { font-size: 12px; color: var(--muted); letter-spacing: 0.5px
 .avatar-strip { display: block; width: 192px; height: 96px; animation: av-blink 3s steps(1) infinite; }
 @keyframes av-blink { 0% { transform: none; } 95%, 100% { transform: translateX(-50%); } }
 
+/* ---------- about page ---------- */
+.placeholder { border: 1px dashed var(--border); border-radius: 6px; padding: 12px 14px; color: var(--faint); font-size: 14px; margin: 0 0 12px; }
+.lede.placeholder { font-size: 15px; margin-bottom: 32px; }
+.about-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.about-card { border: 1px solid transparent; padding: 16px; }
+.about-card .stat-label { margin-bottom: 10px; }
+.about-card .placeholder { margin: 0; }
+
 /* ---------- responsive (keep last so it overrides base rules) ---------- */
 @media (max-width: 760px) {
   .report { padding-top: 48px; }
@@ -278,6 +286,7 @@ table.data td.mono { font-size: 12px; color: var(--muted); letter-spacing: 0.5px
   .bar-label { grid-column: 1 / -1; white-space: normal; }
   .contact { grid-template-columns: 1fr; }
   .explore { grid-template-columns: 1fr; }
+  .about-grid { grid-template-columns: 1fr; }
   .nav-links a { font-size: 10px; letter-spacing: 0.8px; }
   table.data .hide-sm { display: none; }
   .term { bottom: 12px; font-size: 11.5px; }

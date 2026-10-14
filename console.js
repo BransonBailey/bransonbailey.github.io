@@ -20,11 +20,11 @@
   // ---------- achievements (localStorage only) ----------
   var ACH = [
     ["shell", "Found the shell", "Open the terminal"],
-    ["tour", "Grand tour", "Visit all three pages"],
+    ["tour", "Grand tour", "Visit all four pages"],
     ["hire", "Root access", "Run sudo hire branson"],
     ["lost", "Game over", "Find a page that doesn't exist"]
   ];
-  var AKEY = "bb-achievements", PKEY = "bb-pages", PAGES = ["about", "projects", "ncl"];
+  var AKEY = "bb-achievements", PKEY = "bb-pages-v2", PAGES = ["home", "about", "projects", "ncl"];
   var TROPHY = "M2 1h12v1h-12zM0 2h16v1h-16zM0 3h1v1h-1zM2 3h12v1h-12zM15 3h1v1h-1zM0 4h1v1h-1zM2 4h12v1h-12zM15 4h1v1h-1zM1 5h1v1h-1zM3 5h10v1h-10zM14 5h1v1h-1zM2 6h12v1h-12zM4 7h8v1h-8zM5 8h6v1h-6zM6 9h4v1h-4zM7 10h2v1h-2zM7 11h2v1h-2zM5 12h6v1h-6zM4 13h8v1h-8zM4 14h8v1h-8z";
 
   // Storage can be blocked (sandboxed previews, strict privacy modes). Fall back to memory so
@@ -227,7 +227,7 @@
       [["whoami", "who runs this box"],
        ["ls [projects]", "list files"],
        ["cat resume.pdf", "print the resume"],
-       ["cd <about|projects|ncl>", "go to a page"],
+       ["cd <home|about|projects|ncl>", "go to a page"],
        ["sudo hire branson", "you know what this does"],
        ["achievements", "show your progress"],
        ["clear / exit", "clear the screen / close (or press ` / Esc)"]]
@@ -247,7 +247,7 @@
         return;
       }
       if (a.replace(/\/$/, "") === "ncl") { line("8 games, Fall 2023 - Fall 2025. Best: Top 0.4% (team). Try: cd ncl"); return; }
-      if (a.replace(/\/$/, "") === "about") { line("experience  education  certifications  recommendation  contact"); return; }
+      if (a.replace(/\/$/, "") === "about") { line("story  goals  outside-security. Try: cd about"); return; }
       line("ls: cannot access '" + a + "': No such file or directory", "err");
     },
     cat: function (args) {
@@ -273,8 +273,9 @@
       ], function () { link("Full copy: ", "open Bailey_Resume.pdf", RESUME); });
     },
     cd: function (args) {
-      var a = (args[0] || "about").replace(/\/$/, "").replace(/^~$/, "about");
-      var href = pageHref(a === "about" || a === ".." ? "about" : a);
+      var a = (args[0] || "home").replace(/\/$/, "");
+      if (a === "~" || a === ".." || a === "/" || a === ".") a = "home";
+      var href = pageHref(a);
       if (!href) { line("cd: " + args[0] + ": No such file or directory", "err"); return; }
       reopenNext = true; persist(true); // the next page picks the shell back up, still open
       if (href.charAt(0) === "#") { location.href = href; return; } // same-document jump (combined preview)
@@ -304,7 +305,7 @@
       line("ACHIEVEMENTS " + n + "/" + ACH.length, "hi");
       ACH.forEach(function (a) {
         var ok = !!got[a[0]], hint = a[2];
-        if (a[0] === "tour" && !ok) hint += " (" + PAGES.filter(function (x) { return v[x]; }).length + "/3)";
+        if (a[0] === "tour" && !ok) hint += " (" + PAGES.filter(function (x) { return v[x]; }).length + "/" + PAGES.length + ")";
         line("  [" + (ok ? "x" : " ") + "] " + ((ok ? a[1] : "???") + "                    ").slice(0, 20) + hint, ok ? "ok" : "dim");
       });
       line(n === ACH.length ? "100% complete. Thanks for playing." : "Progress is saved in this browser only.", n === ACH.length ? "hi" : "dim");
