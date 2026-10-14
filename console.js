@@ -20,6 +20,7 @@
   // ---------- achievements (localStorage only) ----------
   var ACH = [
     ["shell", "Found the shell", "Open the terminal"],
+    ["talk", "Small talk", "Say hi to the avatar on the home page"],
     ["tour", "Grand tour", "Visit all four pages"],
     ["hire", "Root access", "Run sudo hire branson"],
     ["lost", "Game over", "Find a page that doesn't exist"],
@@ -100,7 +101,8 @@
     on:    [[660, 0, 0.06, "square", 0.6], [990, 0.06, 0.1, "square", 0.6]],
     ach:   [[988, 0, 0.08], [1319, 0.08, 0.35]], // coin: B5 -> E6
     eat:   [[740, 0, 0.04, "square", 0.6], [988, 0.04, 0.05, "square", 0.6]],
-    die:   [[392, 0, 0.1], [294, 0.1, 0.1], [196, 0.2, 0.28]]
+    die:   [[392, 0, 0.1], [294, 0.1, 0.1], [196, 0.2, 0.28]],
+    talk:  [[520, 0, 0.03, "square", 0.35]]
   };
   function sfx(name, delay) {
     if (name === "key") return tones([[1300 + Math.random() * 500, 0, 0.025, "square", 0.25]]);
@@ -145,6 +147,7 @@
     save(AKEY, got);
     queue.push(achName(id));
     if (!showing) nextToast();
+    paintCount();
   }
 
   function nextToast() {
@@ -179,6 +182,163 @@
   }
 
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  function pixelSvg(d, w, h) {
+    var NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg"), p = document.createElementNS(NS, "path");
+    svg.setAttribute("viewBox", "0 0 " + (w || 16) + " " + (h || 16));
+    svg.setAttribute("shape-rendering", "crispEdges"); svg.setAttribute("aria-hidden", "true");
+    p.setAttribute("fill", "currentColor"); p.setAttribute("fill-rule", "evenodd"); p.setAttribute("d", d);
+    svg.appendChild(p);
+    return svg;
+  }
+  function media(q) { return !!(window.matchMedia && matchMedia(q).matches); }
+  var COARSE = media("(pointer: coarse)"), REDUCE = media("(prefers-reduced-motion: reduce)");
+
+  // ---------- footer: achievement count + how to open the terminal ----------
+  var cnt = null;
+  function buildCount() {
+    var f = document.querySelector(".footer");
+    if (!f) return;
+    var bar = document.createElement("div");
+    bar.className = "ach-bar";
+    cnt = document.createElement("button");
+    cnt.type = "button"; cnt.className = "ach-count"; cnt.title = "Achievements";
+    cnt.appendChild(pixelSvg(TROPHY));
+    cnt.appendChild(document.createElement("span"));
+    cnt.addEventListener("click", function () {
+      if (!root || root.hidden) open(); else input.focus();
+      if (!busy) run("achievements");
+    });
+    var hint = document.createElement("span");
+    hint.className = "ach-hint";
+    if (COARSE) hint.textContent = "tap the trophy to open the terminal";
+    else {
+      var k = document.createElement("kbd"); k.textContent = "`";
+      hint.appendChild(document.createTextNode("press "));
+      hint.appendChild(k);
+      hint.appendChild(document.createTextNode(" to open the terminal"));
+    }
+    bar.appendChild(cnt); bar.appendChild(hint);
+    f.insertBefore(bar, f.firstChild);
+    paintCount();
+  }
+  function paintCount() {
+    if (!cnt) return;
+    var got = load(AKEY), n = ACH.filter(function (a) { return got[a[0]]; }).length;
+    cnt.lastChild.textContent = n + "/" + ACH.length;
+    cnt.classList.toggle("done", n === ACH.length);
+    cnt.setAttribute("aria-label", "Achievements: " + n + " of " + ACH.length + " unlocked. Open the terminal");
+  }
+
+  // ---------- avatar dialog box (click the portrait on the home page) ----------
+  // RPG-style text box: types each page out with a blip; click / Enter skips ahead or goes on.
+  var avatar = document.querySelector(".hero .avatar"), bubble = null, talk = null;
+  var BUBBLE = "M2 0h8v1H2zM1 1h10v1H1zM0 2h12v4H0zM1 6h10v1H1zM2 7h8v1H2zM2 8h2v1H2zM2 9h1v1H2zM2 3h2v2H2zM5 3h2v2H5zM8 3h2v2H8z";
+
+  function talkLines() {
+    return [
+      "Hi, I'm Branson. Thanks for stopping by.",
+      "There's a terminal hidden on every page. " +
+        (COARSE ? "Tap the trophy at the bottom of the page to open it." : "Press ` to open it."),
+      "Type 'help' once you're in. There are " + ACH.length + " achievements to find."
+    ];
+  }
+
+  function initAvatar() {
+    if (!avatar) return;
+    avatar.setAttribute("role", "button");
+    avatar.tabIndex = 0;
+    avatar.setAttribute("aria-label", "Pixel-art portrait of Branson. Say hi");
+    avatar.title = "Say hi";
+    avatar.classList.add("can-talk");
+    function poke() { talk ? talkNext() : openTalk(); }
+    avatar.addEventListener("click", poke);
+    avatar.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); poke(); }
+    });
+    if (!load(AKEY).talk) { // a "..." bubble until the visitor has talked once
+      bubble = pixelSvg(BUBBLE, 12, 10);
+      bubble.setAttribute("class", "avatar-bubble");
+      bubble.addEventListener("click", poke);
+      avatar.parentNode.insertBefore(bubble, avatar.nextSibling);
+    }
+  }
+
+  function openTalk() {
+    if (talk) return;
+    if (root && !root.hidden) close(true);
+    var el = document.createElement("div");
+    el.className = "talk"; el.tabIndex = -1;
+    el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Branson says");
+    var face = document.createElement("div"); face.className = "talk-face";
+    var strip = avatar.querySelector("svg").cloneNode(true);
+    strip.setAttribute("class", "talk-strip");
+    face.appendChild(strip);
+    var body = document.createElement("div"); body.className = "talk-body";
+    var name = document.createElement("div"); name.className = "talk-name"; name.textContent = "BRANSON";
+    // The whole line is laid out up front (rest hidden) so words don't jump lines as they type.
+    var text = document.createElement("p"); text.className = "talk-text"; text.setAttribute("aria-hidden", "true");
+    var shown = document.createElement("span"), rest = document.createElement("span");
+    rest.className = "talk-rest";
+    text.appendChild(shown); text.appendChild(rest);
+    var sr = document.createElement("p"); sr.className = "vh"; sr.setAttribute("aria-live", "polite");
+    body.appendChild(name); body.appendChild(text); body.appendChild(sr);
+    var more = document.createElement("span"); more.className = "talk-more"; more.setAttribute("aria-hidden", "true");
+    var x = document.createElement("button");
+    x.type = "button"; x.className = "talk-x"; x.textContent = "\u00d7";
+    x.setAttribute("aria-label", "Close");
+    x.addEventListener("click", function (e) { e.stopPropagation(); closeTalk(); });
+    el.appendChild(face); el.appendChild(body); el.appendChild(more); el.appendChild(x);
+    el.addEventListener("click", talkNext);
+    el.addEventListener("keydown", function (e) {
+      if ((e.key === "Enter" || e.key === " ") && e.target !== x) { e.preventDefault(); talkNext(); }
+    });
+    document.body.appendChild(el);
+    talk = { el: el, shown: shown, rest: rest, sr: sr, more: more, lines: talkLines(), page: 0, timer: null, typing: false };
+    if (bubble) { bubble.remove(); bubble = null; }
+    sfx("open");
+    showPage(0);
+    try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+  }
+
+  function showPage(i) {
+    var t = talk, s = t.lines[i], n = 0;
+    clearInterval(t.timer);
+    t.page = i; t.sr.textContent = s; t.more.textContent = "";
+    t.shown.textContent = ""; t.rest.textContent = s;
+    if (REDUCE) { pageDone(); return; }
+    t.typing = true;
+    t.timer = setInterval(function () {
+      n++;
+      t.shown.textContent = s.slice(0, n); t.rest.textContent = s.slice(n);
+      if (n % 2 && s.charAt(n - 1) !== " ") sfx("talk");
+      if (n >= s.length) pageDone();
+    }, 32);
+  }
+
+  function pageDone() {
+    var t = talk, last = t.page === t.lines.length - 1;
+    clearInterval(t.timer); t.typing = false;
+    t.shown.textContent = t.lines[t.page]; t.rest.textContent = "";
+    t.more.textContent = last ? "\u25a0" : "\u25bc";
+    if (last) unlock("talk");
+  }
+
+  function talkNext() {
+    if (!talk) return;
+    if (talk.typing) pageDone();
+    else if (talk.page + 1 < talk.lines.length) { sfx("tick"); showPage(talk.page + 1); }
+    else closeTalk();
+  }
+
+  // quiet: the terminal is opening and plays its own sound
+  function closeTalk(quiet) {
+    if (!talk) return;
+    clearInterval(talk.timer);
+    talk.el.remove(); talk = null;
+    if (!quiet) sfx("close");
+    try { avatar.focus({ preventScroll: true }); } catch (e) { avatar.focus(); }
+  }
 
   // Sound for a click that loads another page; returns how long to wait so it isn't cut off.
   // If that page is the last one needed for Grand tour, play the coin now, while the click
@@ -574,7 +734,7 @@
       ], function () { link("Next step: ", "message me on LinkedIn", LINKEDIN); unlock("hire"); });
     },
     achievements: function (args) {
-      if (args[0] === "--reset") { save(AKEY, {}); save(PKEY, {}); line("Progress cleared.", "dim"); return; }
+      if (args[0] === "--reset") { save(AKEY, {}); save(PKEY, {}); paintCount(); line("Progress cleared.", "dim"); return; }
       var got = load(AKEY), v = load(PKEY), n = 0;
       ACH.forEach(function (a) { if (got[a[0]]) n++; });
       line("ACHIEVEMENTS " + n + "/" + ACH.length, "hi");
@@ -649,6 +809,7 @@
   }
 
   function open() {
+    closeTalk(true); // before lastFocus, so focus returns to the avatar rather than the removed box
     if (!root) build();
     lastFocus = document.activeElement;
     root.hidden = false;
@@ -667,6 +828,8 @@
 
   mergeCarried();
   buildSnd();
+  buildCount();
+  initAvatar();
   visit();
   // Resume the shell if the visitor left this tab's last page with it open (e.g. via cd).
   if (load(SKEY, SS).open) {
@@ -683,6 +846,7 @@
   window.addEventListener("pageshow", function (e) {
     if (!e.persisted) return;
     mergeCarried();
+    paintCount();
     if (root) restore();
   });
   // Plain links between the site's own pages (nav bar, buttons) carry the state as well.
@@ -690,7 +854,7 @@
   document.addEventListener("click", function (e) {
     if (e.defaultPrevented || e.button !== 0 || !e.target.closest) return;
     var a = e.target.closest("a[href], button, summary, [role=button]");
-    if (!a || a.closest(".snd, .term")) return; // the speaker and terminal have their own sounds
+    if (!a || a.closest(".snd, .term, .ach-count, .avatar, .talk")) return; // these have their own sounds
     var leaves = a.matches("a[href]") && !(e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || a.target === "_blank" || a.hasAttribute("download"))
       && /^(https?|file):$/.test(a.protocol) // mailto: etc. don't unload the page
       && !(a.pathname === location.pathname && a.host === location.host); // in-page #jumps
@@ -715,6 +879,8 @@
       (root && !root.hidden) ? close() : open();
     } else if (e.key === "Escape" && inTerm) {
       close();
+    } else if (e.key === "Escape" && talk) {
+      closeTalk();
     }
   });
 })();
