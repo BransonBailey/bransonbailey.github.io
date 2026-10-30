@@ -1,12 +1,12 @@
-"""Rebuild the About page bookshelf.
+"""Rebuild the About page bookshelf from Goodreads' public embed widgets.
 
-Goodreads closed its API in 2020 and has since shut off its RSS feeds and logged-out shelf pages, so
-"Now reading" is scraped from the public profile page and "Recently finished" comes from
-books/finished.json (newest first; add an entry when you finish a book: id, title, author, and
-optionally series, cover URL, and read date for the yearly count). This runs in a GitHub
-Action: it rewrites the block between the
-reading:start / reading:end markers in about/index.html and saves 16-color pixel covers to books/.
-Visitors only ever load files from this site. Needs Pillow; everything else is stdlib.
+Goodreads closed its API in 2020 and has since shut off its RSS feeds and logged-out shelf pages,
+but the widgets in Profile > Widgets (review/custom_widget, review/grid_widget) still answer plain
+requests. This runs in a GitHub Action: it rewrites the block between the reading:start /
+reading:end markers in about/index.html and saves 16-color pixel covers to books/. Visitors only
+ever load files from this site. "Now reading" comes from the public profile page, which the widgets
+can't give (they only serve the read shelf). books/finished.json (from import_export.py) only supplies finish
+dates for the yearly count. Needs Pillow; everything else is stdlib.
 """
 import html
 import io
@@ -21,7 +21,7 @@ from PIL import Image
 
 USER = "196218728"
 PROFILE = "https://www.goodreads.com/user/show/" + USER
-BOOK = "https://www.goodreads.com/book/show/{id}"
+WIDGET = "https://www.goodreads.com/review/{kind}_widget/" + USER + "{name}?shelf={shelf}&sort=date_read&order=d&num_books={n}"
 UA = "Mozilla/5.0 (bookshelf updater; +https://bransonbailey.github.io/about/)"
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "about" / "index.html"
@@ -62,13 +62,40 @@ def now_reading():
     return books
 
 
-def finished():
-    """Entries from books/finished.json (newest first), plus this year's finished count."""
-    data = json.loads(FINISHED.read_text(encoding="utf-8"))
-    books = [{"cover": "", "series": "", **{**ent, "id": str(ent["id"])}} for ent in data["books"][:RECENT]]
-    year = datetime.now(timezone.utc).year
-    count = data.get("before_tracking", 0) + sum(1 for ent in data["books"] if str(ent.get("read", ""))[:4] == str(year))
-    return books, count
+def widget(kind, shelf, n):
+    """HTML a Goodreads widget would write into the page (it ships as a JS string: var widget_code = '...')."""
+    js = get(WIDGET.format(kind=kind, name=".bookshelf:%20" + shelf if kind == "custom" else "", shelf=shelf, n=n)).decode("utf-8", "replace")
+    m = re.search(r"var widget_code = '(.*)'\s*(?:;|var widget_div)", js, re.S)
+    if not m:
+        raise RuntimeError("unexpected widget response for " + shelf)
+    return re.sub(r"\\(.)", lambda c: "\n" if c.group(1) == "n" else c.group(1), m.group(1))
+
+
+def books(shelf, n):
+    """Newest-first books on the read shelf (custom widget: title incl. series, author, cover). It always
+    serves the read shelf to logged-out requests and caps at 5."""
+    out = []
+    for blk in widget("custom", shelf, n).split("gr_custom_each_container_")[1:]:
+        t = re.search(r'<a title="([^"]+)"[^>]*><img [^>]*src="([^"]+/(\d+)\._S[XY]\d+_[^"]*)"', blk)
+        au = re.search(r'gr_custom_author_\d*">\s*by <a [^>]*>([^<]+)</a>', blk)
+        if not t:
+            continue
+        out.append({
+            "id": t.group(3),
+            "title": html.unescape(t.group(1)).strip(),
+            "author": html.unescape(au.group(1)).strip() if au else "",
+            "cover": re.sub(r"\._S[XY]\d+_", "", t.group(2)),
+        })
+    return out
+
+
+def finished_count():
+    """Books finished this year: everything on the read shelf dated this year in finished.json, plus any
+    book Goodreads lists that isn't in the file yet (newer than the last export, so this year's)."""
+    year = str(datetime.now(timezone.utc).year)
+    dates = {str(b["id"]): str(b.get("read", "")) for b in json.loads(FINISHED.read_text(encoding="utf-8"))["books"]}
+    ids = re.findall(r"/(\d+)\._S[XY]\d+_", widget("grid", "read", 1000))  # cover URLs end in <book id>._SY75_.jpg
+    return sum(1 for i in ids if i not in dates or dates[i][:4] == year)
 
 
 def split_series(title):
@@ -131,10 +158,10 @@ def render(now, recent, count):
 
 
 def main():
-    now = now_reading()
-    recent, count = finished()
-    if not recent:  # an empty list must never wipe the shelf
-        sys.exit("books/finished.json has no books; leaving the page alone")
+    now, recent = now_reading(), books("read", RECENT)[:RECENT]
+    if not recent:  # an empty response must never wipe the shelf
+        sys.exit("read shelf came back empty; leaving the page alone")
+    count = finished_count()
     page = PAGE.read_text(encoding="utf-8")
     a, b = page.find(START), page.find(END)
     if a < 0 or b < a:

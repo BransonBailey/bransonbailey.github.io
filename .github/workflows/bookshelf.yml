@@ -1,5 +1,6 @@
-# Refreshes the About page bookshelf every 12 hours: "Now reading" from the Goodreads profile, "Recently finished"
-# from books/finished.json (also rebuilt whenever that file changes, or on demand from the Actions tab).
+# Refreshes the About page bookshelf every 12 hours from Goodreads: "Now reading" from the public profile, "Recently
+# finished" from the public embed widgets. books/finished.json (import_export.py) supplies finish dates for the yearly
+# count, so a push touching it rebuilds too. Also runnable on demand from the Actions tab.
 # Commits only when the shelf actually changed, then asks Pages to rebuild.
 name: Update bookshelf
 
