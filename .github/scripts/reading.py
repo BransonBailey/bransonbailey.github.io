@@ -1,29 +1,32 @@
-"""Rebuild the About page bookshelf from Goodreads' public RSS feeds.
+"""Rebuild the About page bookshelf.
 
-Goodreads closed its API in 2020 and the RSS feeds send no CORS headers, so the page can't fetch
-them in the browser. This runs in a GitHub Action instead: it rewrites the block between the
+Goodreads closed its API in 2020 and has since shut off its RSS feeds and logged-out shelf pages, so
+"Now reading" is scraped from the public profile page and "Recently finished" comes from
+books/finished.json (newest first; add an entry when you finish a book: id, title, author, and
+optionally series, cover URL, and read date for the yearly count). This runs in a GitHub
+Action: it rewrites the block between the
 reading:start / reading:end markers in about/index.html and saves 16-color pixel covers to books/.
 Visitors only ever load files from this site. Needs Pillow; everything else is stdlib.
 """
 import html
 import io
+import json
 import re
 import sys
 import urllib.request
-import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from PIL import Image
 
 USER = "196218728"
 PROFILE = "https://www.goodreads.com/user/show/" + USER
-FEED = "https://www.goodreads.com/review/list_rss/" + USER + "?shelf={shelf}&sort=date_read&order=d&page={page}"
+BOOK = "https://www.goodreads.com/book/show/{id}"
 UA = "Mozilla/5.0 (bookshelf updater; +https://bransonbailey.github.io/about/)"
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "about" / "index.html"
 COVERS = ROOT / "books"
+FINISHED = COVERS / "finished.json"
 COVER_W, COVER_H, COLORS = 40, 60, 16  # shown at 2x with image-rendering: pixelated
 RECENT = 3
 START = "<!-- reading:start"
@@ -36,32 +39,36 @@ def get(url):
         return r.read()
 
 
-def when(s):
-    s = (s or "").strip()
-    return parsedate_to_datetime(s) if s else None
-
-
-def shelf(name):
-    books, seen = [], set()
-    for page in range(1, 11):  # 100 per page; stop at the first page with nothing new
-        root = ET.fromstring(get(FEED.format(shelf=name, page=page)))
-        new = 0
-        for it in root.iter("item"):
-            bid = (it.findtext("book_id") or "").strip()
-            if not bid or bid in seen:
-                continue
-            seen.add(bid); new += 1
-            books.append({
-                "id": bid,
-                "title": (it.findtext("title") or "").strip(),
-                "author": (it.findtext("author_name") or "").strip(),
-                "cover": (it.findtext("book_large_image_url") or "").strip(),
-                "read": when(it.findtext("user_read_at")),
-                "added": when(it.findtext("user_date_added")),
-            })
-        if not new:
-            break
+def now_reading():
+    """Books in the profile page's 'currently reading' box (the profile is public; the shelf pages aren't)."""
+    page = get(PROFILE).decode("utf-8", "replace")
+    a = page.find('id="currentlyReadingReviews"')
+    if a < 0:
+        return []
+    blocks = page[a:].split('class="Updates')[1:]
+    books = []
+    for blk in blocks:
+        t = re.search(r'class="bookTitle" href="/book/show/(\d+)[^"]*">([^<]+)</a>', blk)
+        if not t:
+            break  # ran past the box into the next section
+        au = re.search(r'class="authorName"[^>]*>([^<]+)</a>', blk)
+        img = re.search(r'<img [^>]*src="([^"]+)"', blk)
+        books.append({
+            "id": t.group(1),
+            "title": html.unescape(t.group(2)).strip(),
+            "author": html.unescape(au.group(1)).strip() if au else "",
+            "cover": re.sub(r"\._S[XY]\d+_", "", img.group(1)) if img else "",
+        })
     return books
+
+
+def finished():
+    """Entries from books/finished.json (newest first), plus this year's finished count."""
+    data = json.loads(FINISHED.read_text(encoding="utf-8"))
+    books = [{"cover": "", "series": "", **{**ent, "id": str(ent["id"])}} for ent in data["books"][:RECENT]]
+    year = datetime.now(timezone.utc).year
+    count = data.get("before_tracking", 0) + sum(1 for ent in data["books"] if str(ent.get("read", ""))[:4] == str(year))
+    return books, count
 
 
 def split_series(title):
@@ -97,6 +104,7 @@ def cover(book):
 def book_html(b, indent, cls):
     e = html.escape
     title, series = split_series(b["title"])
+    series = b.get("series") or series
     src = cover(b)
     img = (f'<img class="book-cover" src="../books/{e(src)}" width="80" height="120" alt="" loading="lazy">'
            if src else '<span class="book-cover none" aria-hidden="true"></span>')
@@ -108,12 +116,9 @@ def book_html(b, indent, cls):
             f'{indent}</a>\n')
 
 
-def render(now, done):
+def render(now, recent, count):
     year = datetime.now(timezone.utc).year
-    recent = sorted(done, key=lambda b: (b["read"] or b["added"] or datetime.min.replace(tzinfo=timezone.utc)), reverse=True)
-    recent = [b for b in recent if b["read"]][:RECENT] or recent[:RECENT]
-    count = sum(1 for b in done if b["read"] and b["read"].year == year)
-    now = sorted(now, key=lambda b: b["added"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)[:2]
+    now = now[:2]
 
     s = '  <div class="shelf">\n    <div class="about-card shelf-now">\n      <div class="stat-label">Now reading</div>\n'
     s += "".join(book_html(b, "      ", "book") for b in now) or '      <p class="book-by">Between books right now.</p>\n'
@@ -126,21 +131,22 @@ def render(now, done):
 
 
 def main():
-    now, done = shelf("currently-reading"), shelf("read")
-    if not done:  # a broken or empty feed must never wipe the shelf
-        sys.exit("read shelf came back empty; leaving the page alone")
+    now = now_reading()
+    recent, count = finished()
+    if not recent:  # an empty list must never wipe the shelf
+        sys.exit("books/finished.json has no books; leaving the page alone")
     page = PAGE.read_text(encoding="utf-8")
     a, b = page.find(START), page.find(END)
     if a < 0 or b < a:
         sys.exit("reading markers not found in " + str(PAGE))
     a = page.index("\n", a) + 1
-    page = page[:a] + render(now, done) + "  " + page[b:]
+    page = page[:a] + render(now, recent, count) + "  " + page[b:]
     PAGE.write_text(page, encoding="utf-8")
     keep = {p for p in re.findall(r'\.\./books/([\w.-]+\.png)', page)}
     for p in COVERS.glob("*.png"):  # drop covers that fell off the shelf
         if p.name not in keep:
             p.unlink()
-    print(f"now: {len(now)}, read: {len(done)}, covers kept: {len(keep)}")
+    print(f"now: {len(now)}, recent: {len(recent)}, finished this year: {count}, covers kept: {len(keep)}")
 
 
 if __name__ == "__main__":
